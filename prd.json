@@ -14,7 +14,7 @@
       "id": "US-01",
       "title": "Core Package Structure",
       "description": "npm package @mizan/sdk with proper package.json, TypeScript types, CommonJS + ESM exports",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "package.json with name @mizan/sdk, version 1.0.0",
         "src/index.ts exports all public APIs",
@@ -27,7 +27,7 @@
       "id": "US-02",
       "title": "PolicyParser",
       "description": "Parse policy text into structured rules using LLM. Input: raw text. Output: Rule[] array.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "PolicyParser class with parse(text: string): Promise<Rule[]>",
         "Rule type: { id, name, condition, action, reason, priority }",
@@ -40,7 +40,7 @@
       "id": "US-03",
       "title": "RuleEngine",
       "description": "Deterministic rule evaluation engine. Input: facts object. Output: Decision with matched rule and reasoning chain.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "RuleEngine class with evaluate(facts: object): Decision",
         "Decision type: { result, matchedRule, reason, score, auditId }",
@@ -55,7 +55,7 @@
       "id": "US-04",
       "title": "AuditLogger",
       "description": "Immutable audit log for every decision. Append-only, exportable.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "AuditLogger class with log(decision: Decision): AuditEntry",
         "AuditEntry: { id, timestamp, input, output, rule, hash }",
@@ -69,7 +69,7 @@
       "id": "US-05",
       "title": "MizanAgent Base Class",
       "description": "Base class for building Mizan-compliant AI agents with built-in governance layer.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "MizanAgent abstract class with run(input): AgentResponse",
         "Built-in: pre-check rules before LLM call",
@@ -83,7 +83,7 @@
       "id": "US-06",
       "title": "CLI Tool",
       "description": "mizan CLI for initializing projects, validating rules, and running decisions from terminal.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "bin/mizan.js executable",
         "mizan init → creates project scaffold (rules.json, .env.example, index.js)",
@@ -97,7 +97,7 @@
       "id": "US-07",
       "title": "Adapters",
       "description": "LLM provider adapters for OpenAI, Anthropic, and a mock adapter for testing.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "OpenAIAdapter: uses OPENAI_API_KEY env var",
         "AnthropicAdapter: uses ANTHROPIC_API_KEY env var",
@@ -110,7 +110,7 @@
       "id": "US-08",
       "title": "Documentation Site",
       "description": "Single-page HTML docs site with quickstart, API reference, and live examples.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "docs/index.html — full documentation site",
         "Mizan navy+gold branding",
@@ -124,7 +124,7 @@
       "id": "US-09",
       "title": "Example Projects",
       "description": "Two example implementations showing SDK in action.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "examples/investment-screener/ — Masdar-style investment rules example",
         "examples/compliance-checker/ — UAE commercial license compliance example",
@@ -137,7 +137,7 @@
       "id": "US-10",
       "title": "Tests",
       "description": "Jest test suite covering core functionality.",
-      "passes": false,
+      "passes": true,
       "acceptanceCriteria": [
         "tests/rule-engine.test.js — 5+ test cases",
         "tests/audit-logger.test.js — 3+ test cases",
