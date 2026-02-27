@@ -1,6 +1,6 @@
 {
   "name": "@mizan/sdk",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AI agent framework with built-in governance, rules enforcement, and audit trails",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
