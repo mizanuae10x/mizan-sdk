@@ -211,8 +211,188 @@ app.post('/api/test-connection', async (req, res) => {
   }
 });
 
-// ---- AGENTS ----
+// ---- AGENTS CRUD ----
+const PROJECT_DIR = path.resolve(__dirname, '..', '..', '..', '..');
+
 app.get('/api/agents', (req, res) => res.json(readJSON(AGENTS_FILE)));
+
+app.post('/api/agents', (req, res) => {
+  const agents = readJSON(AGENTS_FILE);
+  const { name, type, description, model, tools, rules, systemPrompt } = req.body;
+  if (!name) return res.status(400).json({ error: 'Agent name required' });
+
+  const id = 'agent-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const filename = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.js';
+
+  // Build agent JS file
+  const toolImports = (tools || []).map(t => t).join(', ');
+  const toolRegistrations = (tools || []).map(t => `  agent.registerTool(${t});`).join('\n');
+  const rulesJSON = JSON.stringify(rules || [], null, 4);
+
+  const thinkBody = buildThinkBody(type, tools);
+
+  const agentCode = `require('dotenv').config();
+const { MizanAgent, ${toolImports ? toolImports + ', ' : ''}autoDetectAdapter } = require('@mizan/sdk');
+
+// Agent: ${name}
+// Type: ${type || 'custom'}
+// ${description || ''}
+
+const RULES = ${rulesJSON};
+
+class ${toPascalCase(name)}Agent extends MizanAgent {
+  async think(input) {
+${thinkBody}
+  }
+}
+
+async function main() {
+  const agent = new ${toPascalCase(name)}Agent({
+    adapter: autoDetectAdapter(),
+    rules: RULES
+  });
+
+${toolRegistrations}
+
+  // Run the agent
+  const result = await agent.run(input || { query: 'Hello' });
+  console.log('\\n--- Agent Output ---');
+  console.log(result.output);
+  console.log('\\n--- Decisions ---');
+  result.decisions.forEach(d => {
+    console.log(\`  [\${d.result}] \${d.reason}\`);
+  });
+}
+
+// Accept input from command line or use default
+const input = process.argv[2] ? JSON.parse(process.argv[2]) : undefined;
+main().catch(console.error);
+`;
+
+  // Write agent file to project root
+  const filePath = path.join(PROJECT_DIR, 'agents', filename);
+  const agentsDir = path.join(PROJECT_DIR, 'agents');
+  if (!fs.existsSync(agentsDir)) fs.mkdirSync(agentsDir, { recursive: true });
+  fs.writeFileSync(filePath, agentCode);
+
+  const agent = {
+    id, name, type: type || 'custom', description: description || '',
+    model: model || 'gpt-4o-mini', tools: tools || [], rules: rules || [],
+    systemPrompt: systemPrompt || '', filename, filePath,
+    status: 'idle', decisions: 0, lastActivity: null, createdAt: new Date().toISOString()
+  };
+  agents.push(agent);
+  writeJSON(AGENTS_FILE, agents);
+  res.status(201).json(agent);
+});
+
+app.delete('/api/agents/:id', (req, res) => {
+  let agents = readJSON(AGENTS_FILE);
+  const agent = agents.find(a => a.id === req.params.id);
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  // Remove file
+  try { fs.unlinkSync(path.join(PROJECT_DIR, 'agents', agent.filename)); } catch {}
+  agents = agents.filter(a => a.id !== req.params.id);
+  writeJSON(AGENTS_FILE, agents);
+  res.json({ success: true });
+});
+
+app.post('/api/agents/:id/run', async (req, res) => {
+  const agents = readJSON(AGENTS_FILE);
+  const agent = agents.find(a => a.id === req.params.id);
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+  const filePath = path.join(PROJECT_DIR, 'agents', agent.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Agent file not found' });
+
+  const inputJSON = JSON.stringify(req.body.input || { query: 'test' });
+  const { execSync } = require('child_process');
+  try {
+    const output = execSync(`node "${filePath}" '${inputJSON}'`, {
+      cwd: PROJECT_DIR, timeout: 30000, encoding: 'utf8',
+      env: { ...process.env, DOTENV_CONFIG_PATH: path.join(PROJECT_DIR, '.env') }
+    });
+    // Update agent stats
+    const idx = agents.findIndex(a => a.id === req.params.id);
+    agents[idx].decisions = (agents[idx].decisions || 0) + 1;
+    agents[idx].lastActivity = new Date().toISOString();
+    agents[idx].status = 'idle';
+    writeJSON(AGENTS_FILE, agents);
+    res.json({ success: true, output: output.trim() });
+  } catch (e) {
+    res.json({ success: false, error: e.stderr || e.message, output: e.stdout || '' });
+  }
+});
+
+app.get('/api/agents/:id/code', (req, res) => {
+  const agents = readJSON(AGENTS_FILE);
+  const agent = agents.find(a => a.id === req.params.id);
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  const filePath = path.join(PROJECT_DIR, 'agents', agent.filename);
+  try {
+    const code = fs.readFileSync(filePath, 'utf8');
+    res.json({ code, filename: agent.filename });
+  } catch {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
+function toPascalCase(str) {
+  return str.replace(/[^a-zA-Z0-9]+(.)/g, (_, c) => c.toUpperCase())
+    .replace(/^(.)/, (_, c) => c.toUpperCase());
+}
+
+function buildThinkBody(type, tools) {
+  switch (type) {
+    case 'research':
+      return `    // Research agent: search and analyze
+    const search = await this.useTool('web_search', { query: input.query || input.topic });
+    if (this.adapter) {
+      const prompt = \`Analyze this research topic: \${input.query || input.topic}\\n\\nSearch results: \${JSON.stringify(search.data)}\\n\\nProvide a clear summary.\`;
+      return await this.adapter.complete(prompt);
+    }
+    return \`Research results: \${JSON.stringify(search.data)}\`;`;
+    case 'governance':
+      return `    // Governance agent: evaluate against rules
+    if (this.adapter) {
+      const prompt = \`You are a governance agent. Evaluate this request based on the rules and facts provided.\\n\\nFacts: \${JSON.stringify(input)}\\n\\nProvide your assessment.\`;
+      return await this.adapter.complete(prompt);
+    }
+    return JSON.stringify({ assessed: true, input });`;
+    case 'chat':
+      return `    // Chat agent: conversational with memory
+    const memories = this.recall(input.message || input.query || '', 3);
+    const context = memories.length ? '\\nRelevant context: ' + memories.map(m => m.content).join('; ') : '';
+    if (this.adapter) {
+      const prompt = \`\${input.message || input.query}\${context}\`;
+      const response = await this.adapter.complete(prompt);
+      this.remember(input.message || input.query, ['conversation']);
+      return response;
+    }
+    return 'No LLM adapter configured';`;
+    case 'compliance':
+      return `    // Compliance agent: check policies
+    if (this.adapter) {
+      const prompt = \`You are a compliance officer. Review the following for regulatory compliance:\\n\\n\${JSON.stringify(input)}\\n\\nIdentify any compliance issues and provide recommendations.\`;
+      return await this.adapter.complete(prompt);
+    }
+    return JSON.stringify({ compliant: true, input });`;
+    case 'data':
+      return `    // Data agent: analyze and process
+    const calc = input.expression ? await this.useTool('calculate', { expression: input.expression }) : null;
+    if (this.adapter) {
+      const prompt = \`Analyze this data:\\n\${JSON.stringify(input)}\${calc ? '\\nCalculation: ' + JSON.stringify(calc.data) : ''}\\n\\nProvide insights.\`;
+      return await this.adapter.complete(prompt);
+    }
+    return JSON.stringify({ analyzed: true, calculation: calc?.data, input });`;
+    default:
+      return `    // Custom agent logic
+    if (this.adapter) {
+      return await this.adapter.complete(JSON.stringify(input));
+    }
+    return JSON.stringify({ processed: true, input });`;
+  }
+}
 
 app.listen(PORT, () => {
   console.log(`\x1b[33m⚖️  Mizan Studio running on http://localhost:${PORT}\x1b[0m`);
