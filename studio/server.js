@@ -212,7 +212,7 @@ app.post('/api/test-connection', async (req, res) => {
 });
 
 // ---- AGENTS CRUD ----
-const PROJECT_DIR = path.resolve(__dirname, '..', '..', '..', '..');
+const PROJECT_DIR = path.resolve(process.env.MIZAN_PROJECT_DIR || path.join(__dirname, '..', '..'));
 
 app.get('/api/agents', (req, res) => res.json(readJSON(AGENTS_FILE)));
 
@@ -222,7 +222,8 @@ app.post('/api/agents', (req, res) => {
   if (!name) return res.status(400).json({ error: 'Agent name required' });
 
   const id = 'agent-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const filename = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.js';
+  const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50);
+  const filename = safeName + '-' + Date.now().toString(36) + '.js';
 
   // Build agent JS file
   const toolImports = (tools || []).map(t => t).join(', ');
@@ -270,10 +271,21 @@ main().catch(console.error);
 `;
 
   // Write agent file to project root
-  const filePath = path.join(PROJECT_DIR, 'agents', filename);
-  const agentsDir = path.join(PROJECT_DIR, 'agents');
+  const AGENTS_DIR = path.resolve(process.env.MIZAN_AGENTS_PATH || path.join(PROJECT_DIR, 'agents'));
+  const filePath = path.join(AGENTS_DIR, filename);
+  // Security: ensure file stays within agents dir
+  if (!filePath.startsWith(AGENTS_DIR)) return res.status(400).json({ error: 'Invalid agent path' });
+  const agentsDir = AGENTS_DIR;
   if (!fs.existsSync(agentsDir)) fs.mkdirSync(agentsDir, { recursive: true });
   fs.writeFileSync(filePath, agentCode);
+
+  // Validate rule conditions — only allow safe expressions
+  const SAFE_CONDITION_RE = /^[\w\s\d\.\[\]'"<>=!&|().,+\-*/]+$/;
+  for (const rule of (rules || [])) {
+    if (rule.condition && !SAFE_CONDITION_RE.test(rule.condition)) {
+      return res.status(400).json({ error: `Invalid condition in rule "${rule.name}": only alphanumeric and basic operators allowed` });
+    }
+  }
 
   const agent = {
     id, name, type: type || 'custom', description: description || '',
@@ -291,7 +303,13 @@ app.delete('/api/agents/:id', (req, res) => {
   const agent = agents.find(a => a.id === req.params.id);
   if (!agent) return res.status(404).json({ error: 'Agent not found' });
   // Remove file
-  try { fs.unlinkSync(path.join(PROJECT_DIR, 'agents', agent.filename)); } catch {}
+  try {
+    const AGENTS_DIR = path.resolve(process.env.MIZAN_AGENTS_PATH || path.join(PROJECT_DIR, 'agents'));
+    const delPath = path.join(AGENTS_DIR, path.basename(agent.filename));
+    if (delPath.startsWith(AGENTS_DIR) && fs.existsSync(delPath)) {
+      fs.unlinkSync(delPath);
+    }
+  } catch {}
   agents = agents.filter(a => a.id !== req.params.id);
   writeJSON(AGENTS_FILE, agents);
   res.json({ success: true });
@@ -305,12 +323,17 @@ app.post('/api/agents/:id/run', async (req, res) => {
   const filePath = path.join(PROJECT_DIR, 'agents', agent.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Agent file not found' });
 
-  const inputJSON = JSON.stringify(req.body.input || { query: 'test' });
-  const { execSync } = require('child_process');
+  const inputData = req.body.input || { query: 'test' };
+  const { execFile } = require('child_process');
   try {
-    const output = execSync(`node "${filePath}" '${inputJSON}'`, {
-      cwd: PROJECT_DIR, timeout: 30000, encoding: 'utf8',
-      env: { ...process.env, DOTENV_CONFIG_PATH: path.join(PROJECT_DIR, '.env') }
+    const output = await new Promise((resolve, reject) => {
+      execFile('node', [filePath, JSON.stringify(inputData)], {
+        cwd: PROJECT_DIR, timeout: 15000, encoding: 'utf8',
+        env: { ...process.env }
+      }, (err, stdout, stderr) => {
+        if (err && !stdout) return reject(err);
+        resolve(stdout || stderr);
+      });
     });
     // Update agent stats
     const idx = agents.findIndex(a => a.id === req.params.id);
