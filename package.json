@@ -24,7 +24,9 @@
   "author": "Abdullah Alkaabi",
   "license": "MIT",
   "dependencies": {
-    "dotenv": "^16.6.1"
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

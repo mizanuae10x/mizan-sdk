@@ -1,0 +1,19 @@
+/* Mizan Studio — Mobile Responsive (Navy Theme) */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); transition: transform .3s ease; width: 260px; }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0 !important; padding: 20px !important; }
+  .hamburger { display: flex !important; }
+  .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.6); z-index: 9; }
+  .overlay.show { display: block; }
+  .hero h1 { font-size: 28px !important; }
+  .hero p { font-size: 14px !important; }
+  .stats-grid, .features, .cards-grid { grid-template-columns: 1fr !important; }
+  .hero .flow { flex-direction: column; }
+  .hero .flow .arrow { transform: rotate(90deg); }
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+  .form-grid { grid-template-columns: 1fr !important; }
+  .modal-content { width: 95% !important; margin: 10px !important; max-height: 90vh; overflow-y: auto; }
+  .btn { padding: 10px 20px !important; font-size: 14px !important; }
+  .getting-started .steps { grid-template-columns: 1fr !important; }
+}

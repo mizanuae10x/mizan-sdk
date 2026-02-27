@@ -36,12 +36,28 @@ async function main() {
     case 'parse': return cmdParse(args[0]);
     case 'setup': return cmdSetup();
     case 'doctor': return cmdDoctor();
+    case 'studio': return cmdStudio();
     case 'help': case '--help': case undefined: return cmdHelp();
     default:
       print(`Unknown command: ${command}`, c.red);
       cmdHelp();
       process.exit(1);
   }
+}
+
+function cmdStudio() {
+  const { spawn, exec: execCmd } = require('child_process');
+  const studioPath = path.join(__dirname, '..', 'studio', 'server.js');
+  if (!fs.existsSync(studioPath)) {
+    print('Studio not found at ' + studioPath, c.red);
+    process.exit(1);
+  }
+  console.log(`${c.yellow}⚖️  Starting Mizan Studio...${c.reset}`);
+  console.log(`${c.cyan} → http://localhost:4000${c.reset}\n`);
+  const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  execCmd(`${openCmd} http://localhost:4000`);
+  const server = spawn('node', [studioPath], { stdio: 'inherit' });
+  server.on('error', (e) => print('Studio error: ' + e.message, c.red));
 }
 
 function cmdHelp() {
@@ -53,6 +69,7 @@ ${c.bold}Commands:${c.reset}
   ${c.cyan}init${c.reset} <name>            Create a new Mizan project
   ${c.cyan}setup${c.reset}                  Interactive environment setup
   ${c.cyan}doctor${c.reset}                 Check environment health
+  ${c.cyan}studio${c.reset}                 Launch Mizan Studio (web dashboard)
   ${c.cyan}validate${c.reset} <rules.json>  Validate rules for conflicts
   ${c.cyan}decide${c.reset} <rules> <facts> Run engine and print decision
   ${c.cyan}parse${c.reset} <policy.txt>     Extract rules from policy text

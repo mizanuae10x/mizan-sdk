@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setup — Mizan Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mobile.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#060C18;color:#fff;display:flex;min-height:100vh}
+.sidebar{width:240px;background:#0B1F3A;padding:24px 0;display:flex;flex-direction:column;position:fixed;height:100vh;z-index:10}
+.sidebar .logo{padding:0 24px 24px;font-size:22px;font-weight:700;color:#D4AF37;border-bottom:1px solid rgba(212,175,55,.2)}
+.sidebar nav{flex:1;padding:16px 0}
+.sidebar nav a{display:flex;align-items:center;gap:10px;padding:12px 24px;color:rgba(255,255,255,.7);text-decoration:none;font-size:14px;transition:all .2s}
+.sidebar nav a:hover,.sidebar nav a.active{color:#D4AF37;background:rgba(212,175,55,.08)}
+.sidebar nav a.active{border-right:3px solid #D4AF37}
+.sidebar .version{padding:16px 24px;font-size:12px;color:rgba(255,255,255,.3);border-top:1px solid rgba(212,175,55,.1)}
+.main{margin-left:240px;flex:1;padding:40px;max-width:900px}
+.hamburger{display:none;position:fixed;top:16px;left:16px;z-index:20;background:#0B1F3A;border:1px solid rgba(212,175,55,.3);color:#D4AF37;font-size:24px;padding:8px 12px;border-radius:8px;cursor:pointer}
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9}
+h1{font-size:28px;margin-bottom:8px}
+.subtitle{color:rgba(255,255,255,.5);margin-bottom:24px;font-size:14px}
+.btn{padding:10px 24px;background:#D4AF37;color:#0B1F3A;font-weight:600;border-radius:8px;border:none;cursor:pointer;font-size:14px}
+.btn:hover{background:#c9a430}
+.btn-sm{padding:6px 16px;font-size:12px}
+.btn-outline{background:transparent;border:1px solid rgba(212,175,55,.4);color:#D4AF37}
+.btn-outline:hover{background:rgba(212,175,55,.1)}
+.btn-green{background:#34d399;color:#0B1F3A}
+.btn-green:hover{background:#2bc48d}
+.env-table{width:100%;margin-bottom:24px}
+.env-row{background:rgba(11,31,58,.6);border:1px solid rgba(212,175,55,.1);border-radius:12px;padding:20px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr auto;gap:16px;align-items:center}
+.env-row .key{font-weight:600;font-size:14px;color:#D4AF37}
+.env-row .desc{font-size:12px;color:rgba(255,255,255,.4);margin-top:4px}
+.env-row .status{font-size:13px}
+.status-set{color:#34d399}
+.status-unset{color:#fbbf24}
+.env-row input{width:100%;padding:8px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(212,175,55,.2);border-radius:6px;color:#fff;font-family:'Courier New',monospace;font-size:13px}
+.env-row input:focus{outline:none;border-color:#D4AF37}
+.env-row .actions{display:flex;gap:8px;flex-wrap:wrap}
+.test-result{margin-top:12px;padding:12px 16px;border-radius:8px;font-size:13px;display:none}
+.test-result.show{display:block}
+.test-result.success{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:#34d399}
+.test-result.fail{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444}
+.footer{text-align:center;padding:40px;font-size:12px;color:rgba(255,255,255,.25)}
+</style>
+</head>
+<body>
+<div class="hamburger" onclick="toggleSidebar()">☰</div>
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+<div class="sidebar" id="sidebar">
+  <div class="logo">⚖️ Mizan Studio</div>
+  <nav>
+    <a href="index.html">🏠 Home</a>
+    <a href="rules.html">📋 Rule Editor</a>
+    <a href="decide.html">⚡ Decision Tester</a>
+    <a href="audit.html">📊 Audit Log</a>
+    <a href="agents.html">🤖 Agent Monitor</a>
+    <a href="setup.html" class="active">⚙️ Setup</a>
+  </nav>
+  <div class="version">📦 v1.1.0</div>
+</div>
+<div class="main">
+  <h1>⚙️ Environment Setup</h1>
+  <p class="subtitle">Configure API keys and paths for your Mizan SDK</p>
+  <div id="envVars"></div>
+  <div class="test-result" id="testResult"></div>
+  <div class="footer">⚖️ Mizan Framework SDK v1.1.0 | Built by mizanuae10x</div>
+</div>
+<script>
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('show')}
+async function loadEnv(){
+  const vars=await(await fetch('/api/env')).json();
+  const el=document.getElementById('envVars');
+  el.innerHTML=vars.map((v,i)=>{
+    const canTest=v.key==='OPENAI_API_KEY'||v.key==='ANTHROPIC_API_KEY';
+    const provider=v.key==='OPENAI_API_KEY'?'openai':v.key==='ANTHROPIC_API_KEY'?'anthropic':'';
+    return `<div class="env-row">
+      <div><div class="key">${v.key}</div><div class="desc">${v.description}</div><div class="status ${v.isSet?'status-set':'status-unset'}">${v.isSet?'✅ Set':'⚠️ Not set'}</div></div>
+      <div><input id="env-${i}" type="${v.key.includes('KEY')?'password':'text'}" value="${v.value||''}" placeholder="Enter value..."></div>
+      <div class="actions">
+        <button class="btn btn-sm" onclick="saveEnv('${v.key}',${i})">Save</button>
+        ${canTest?`<button class="btn btn-sm btn-green" onclick="testConn('${provider}')">Test</button>`:''}
+      </div>
+    </div>`}).join('');
+}
+async function saveEnv(key,idx){
+  const value=document.getElementById('env-'+idx).value;
+  await fetch('/api/env',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})});
+  showResult('✅ Saved '+key,'success');
+  setTimeout(loadEnv,500);
+}
+async function testConn(provider){
+  showResult('Testing '+provider+'...','success');
+  const r=await(await fetch('/api/test-connection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider})})).json();
+  showResult(r.success?'✅ '+provider+' connection successful!':'❌ '+provider+' failed: '+(r.error||'status '+r.status),r.success?'success':'fail');
+}
+function showResult(msg,cls){
+  const el=document.getElementById('testResult');
+  el.textContent=msg;el.className='test-result show '+cls;
+  setTimeout(()=>el.classList.remove('show'),5000);
+}
+loadEnv();
+</script>
+</body>
+</html>
