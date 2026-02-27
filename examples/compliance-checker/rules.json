@@ -1,0 +1,7 @@
+[
+  { "id": "R1", "name": "Valid Trade License", "condition": "hasLicense === true && licenseExpired === false", "action": "APPROVED", "reason": "Valid UAE commercial license", "priority": 1 },
+  { "id": "R2", "name": "Expired License", "condition": "licenseExpired === true", "action": "REJECTED", "reason": "Commercial license has expired — renewal required", "priority": 0 },
+  { "id": "R3", "name": "No License", "condition": "hasLicense === false", "action": "REJECTED", "reason": "No commercial license on file", "priority": 0 },
+  { "id": "R4", "name": "Restricted Activity", "condition": "restrictedActivity === true", "action": "REVIEW", "reason": "Activity requires additional regulatory approval", "priority": 2 },
+  { "id": "R5", "name": "Free Zone Entity", "condition": "freeZone === true && hasLicense === true", "action": "APPROVED", "reason": "Free zone entity with valid license — compliant", "priority": 1 }
+]

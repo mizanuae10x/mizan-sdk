@@ -1,0 +1,35 @@
+{
+  "name": "@mizan/sdk",
+  "version": "1.0.0",
+  "description": "Developer SDK for building AI agents compliant with the Mizan Framework Neuro-Symbolic architecture",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mizan": "./bin/mizan.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --no-cache",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["mizan", "ai", "governance", "rule-engine", "compliance", "uae"],
+  "author": "Abdullah Alkaabi",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "jest": "^29.7.0",
+    "@types/node": "^20.0.0"
+  },
+  "peerDependencies": {
+    "openai": ">=4.0.0",
+    "@anthropic-ai/sdk": ">=0.10.0"
+  },
+  "peerDependenciesMeta": {
+    "openai": { "optional": true },
+    "@anthropic-ai/sdk": { "optional": true }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": ["dist/", "bin/", "README.md", "LICENSE"]
+}

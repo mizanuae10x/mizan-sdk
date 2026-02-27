@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mizan SDK — Documentation</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy:#0B1F3A;--gold:#D4AF37;--bg:#f8f9fa;--text:#1a1a1a;--code-bg:#1e1e1e;--sidebar-w:280px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--text);background:var(--bg);display:flex;min-height:100vh}
+a{color:var(--gold);text-decoration:none}a:hover{text-decoration:underline}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar-w);background:var(--navy);color:#fff;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;padding:2rem 1.5rem}
+.sidebar .logo{font-size:2rem;margin-bottom:.25rem}
+.sidebar h2{font-size:1rem;color:var(--gold);margin:1.5rem 0 .5rem;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.sidebar a{color:#ccd6e0;display:block;padding:.35rem 0;font-size:.95rem}
+.sidebar a:hover,.sidebar a.active{color:var(--gold);text-decoration:none}
+
+/* Main */
+.main{margin-left:var(--sidebar-w);padding:3rem 4rem;max-width:900px;flex:1}
+.main h1{font-size:2.2rem;color:var(--navy);margin-bottom:1rem;border-bottom:3px solid var(--gold);padding-bottom:.5rem}
+.main h2{font-size:1.5rem;color:var(--navy);margin:2.5rem 0 1rem;padding-bottom:.3rem;border-bottom:1px solid #ddd}
+.main h3{font-size:1.15rem;color:var(--navy);margin:1.5rem 0 .5rem}
+.main p,.main li{line-height:1.7;margin-bottom:.75rem}
+.main ul{padding-left:1.5rem}
+.main code{background:#e8edf3;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{position:relative;margin:1rem 0;border-radius:8px;overflow:hidden}
+pre code{background:none;padding:1.25rem;display:block;font-size:.88rem;line-height:1.5}
+.copy-btn{position:absolute;top:8px;right:8px;background:var(--gold);color:var(--navy);border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.8rem;font-weight:600}
+.copy-btn:hover{opacity:.8}
+.badge{display:inline-block;background:var(--gold);color:var(--navy);padding:2px 10px;border-radius:12px;font-size:.8rem;font-weight:600;margin-left:6px}
+table{width:100%;border-collapse:collapse;margin:1rem 0}
+th{background:var(--navy);color:#fff;padding:.6rem 1rem;text-align:left}
+td{padding:.5rem 1rem;border-bottom:1px solid #ddd}
+.hero{background:var(--navy);color:#fff;padding:2.5rem;border-radius:12px;margin-bottom:2rem}
+.hero h1{color:#fff;border:none}
+.hero .subtitle{color:var(--gold);font-size:1.1rem}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:1.5rem}}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="logo">⚖️ Mizan SDK</div>
+  <div style="color:#8899aa;font-size:.85rem">v1.0.0</div>
+  <h2>Getting Started</h2>
+  <a href="#installation">Installation</a>
+  <a href="#quickstart">Quick Start</a>
+  <h2>Core APIs</h2>
+  <a href="#rule-engine">RuleEngine</a>
+  <a href="#audit-logger">AuditLogger</a>
+  <a href="#policy-parser">PolicyParser</a>
+  <a href="#mizan-agent">MizanAgent</a>
+  <a href="#adapters">Adapters</a>
+  <h2>Tools</h2>
+  <a href="#cli">CLI Reference</a>
+  <h2>More</h2>
+  <a href="#examples">Examples</a>
+  <a href="#license">License</a>
+  <a href="https://github.com/mizanuae10x/mizan-sdk" target="_blank">GitHub ↗</a>
+</nav>
+
+<div class="main">
+<div class="hero">
+  <h1>⚖️ Mizan SDK</h1>
+  <p class="subtitle">Build governed AI agents with deterministic rule evaluation and immutable audit trails.</p>
+</div>
+
+<h1 id="installation">Installation</h1>
+<pre><code class="language-bash">npm install @mizan/sdk</code></pre>
+
+<h1 id="quickstart">Quick Start</h1>
+<pre><code class="language-javascript">const { RuleEngine, AuditLogger } = require('@mizan/sdk');
+
+const rules = [
+  { id: 'R1', name: 'Approve', condition: 'score >= 80',
+    action: 'APPROVED', reason: 'High score', priority: 1 },
+  { id: 'R2', name: 'Reject', condition: 'score < 30',
+    action: 'REJECTED', reason: 'Too low', priority: 2 },
+];
+
+const engine = new RuleEngine();
+engine.loadRules(rules);
+
+const decision = engine.evaluate({ score: 92 });
+console.log(decision);
+// { result: 'APPROVED', matchedRule: {...}, reason: 'High score', score: 85, auditId: '...' }
+
+const logger = new AuditLogger();
+logger.log(decision, { score: 92 });</code></pre>
+
+<h1 id="rule-engine">RuleEngine</h1>
+<p>Deterministic rule evaluation engine. Rules are compiled to safe sandboxed functions — <strong>no eval()</strong>.</p>
+
+<h3>Methods</h3>
+<table>
+<tr><th>Method</th><th>Description</th></tr>
+<tr><td><code>loadRules(rules: Rule[])</code></td><td>Load and sort rules by priority</td></tr>
+<tr><td><code>addRule(rule: Rule)</code></td><td>Add a single rule</td></tr>
+<tr><td><code>evaluate(facts: object): Decision</code></td><td>Evaluate facts against rules, return first match</td></tr>
+<tr><td><code>detectConflicts(): Conflict[]</code></td><td>Find rules with same condition but different actions</td></tr>
+</table>
+
+<h3>Rule Type</h3>
+<pre><code class="language-typescript">interface Rule {
+  id: string;        // Unique identifier
+  name: string;      // Human-readable name
+  condition: string; // JS boolean expression (e.g. "score >= 80")
+  action: 'APPROVED' | 'REJECTED' | 'REVIEW';
+  reason: string;    // Explanation
+  priority: number;  // Lower = higher priority
+}</code></pre>
+
+<h3>Decision Type</h3>
+<pre><code class="language-typescript">interface Decision {
+  result: 'APPROVED' | 'REJECTED' | 'REVIEW';
+  matchedRule: Rule | null;
+  reason: string;
+  score: number;    // 0-100
+  auditId: string;  // UUID for audit trail
+}</code></pre>
+
+<h1 id="audit-logger">AuditLogger</h1>
+<p>Immutable audit log with SHA-256 hash chain. Every entry references the previous entry's hash, making tampering detectable.</p>
+
+<h3>Methods</h3>
+<table>
+<tr><th>Method</th><th>Description</th></tr>
+<tr><td><code>log(decision, input)</code></td><td>Record a decision with hash chain</td></tr>
+<tr><td><code>query(filter?)</code></td><td>Filter entries by date range or result</td></tr>
+<tr><td><code>exportCSV()</code></td><td>Export entries as CSV string</td></tr>
+<tr><td><code>verify()</code></td><td>Verify hash chain integrity</td></tr>
+</table>
+
+<pre><code class="language-javascript">const logger = new AuditLogger('./data/audit.jsonl');
+logger.log(decision, { score: 90 });
+
+// Verify chain integrity
+console.log(logger.verify()); // true
+
+// Export
+const csv = logger.exportCSV();</code></pre>
+
+<h1 id="policy-parser">PolicyParser</h1>
+<p>Extract structured rules from natural language policy text. Uses LLM when available, falls back to regex-based parsing.</p>
+
+<pre><code class="language-javascript">const { PolicyParser, MockAdapter } = require('@mizan/sdk');
+
+// With LLM
+const parser = new PolicyParser(new OpenAIAdapter());
+const rules = await parser.parse('Investments over $1M are approved...');
+
+// Without LLM (regex fallback)
+const parser2 = new PolicyParser();
+const rules2 = await parser2.parse('Must have valid license');
+
+// From file
+const rules3 = await parser.parseFile('./policy.txt');</code></pre>
+
+<h1 id="mizan-agent">MizanAgent</h1>
+<p>Abstract base class for building governed AI agents. Automatically applies pre/post rule checks and audit logging.</p>
+
+<pre><code class="language-javascript">const { MizanAgent } = require('@mizan/sdk');
+
+class MyAgent extends MizanAgent {
+  async think(input) {
+    // Your LLM logic here
+    return `Analysis of ${JSON.stringify(input)}`;
+  }
+}
+
+const agent = new MyAgent({
+  rules: [...],
+  adapter: new OpenAIAdapter(),
+});
+
+const response = await agent.run({ query: 'Analyze investment' });
+// response.output — LLM result
+// response.decisions — pre/post check results
+// response.auditTrail — full audit entries</code></pre>
+
+<h1 id="adapters">Adapters</h1>
+<p>LLM provider adapters. All implement <code>LLMAdapter</code> interface.</p>
+
+<table>
+<tr><th>Adapter</th><th>Env Variable</th><th>Description</th></tr>
+<tr><td><code>OpenAIAdapter</code></td><td>OPENAI_API_KEY</td><td>GPT-4 and other OpenAI models</td></tr>
+<tr><td><code>AnthropicAdapter</code></td><td>ANTHROPIC_API_KEY</td><td>Claude models</td></tr>
+<tr><td><code>MockAdapter</code></td><td>—</td><td>Deterministic test responses</td></tr>
+</table>
+
+<pre><code class="language-javascript">const { autoDetectAdapter } = require('@mizan/sdk');
+// Auto-detects from env vars, falls back to MockAdapter
+const adapter = autoDetectAdapter();</code></pre>
+
+<h1 id="cli">CLI Reference</h1>
+<table>
+<tr><th>Command</th><th>Description</th></tr>
+<tr><td><code>mizan init &lt;name&gt;</code></td><td>Create a new Mizan project with sample rules</td></tr>
+<tr><td><code>mizan validate &lt;rules.json&gt;</code></td><td>Validate rules and check for conflicts</td></tr>
+<tr><td><code>mizan decide &lt;rules.json&gt; &lt;facts.json&gt;</code></td><td>Evaluate facts and print decision</td></tr>
+<tr><td><code>mizan parse &lt;policy.txt&gt;</code></td><td>Extract rules from policy text</td></tr>
+</table>
+
+<h1 id="examples">Examples</h1>
+<h3>Investment Screener</h3>
+<p>Masdar-style investment screening with sanctions checks, minimum thresholds, and green energy fast-tracking.</p>
+<pre><code class="language-bash">cd examples/investment-screener && node index.js</code></pre>
+
+<h3>Compliance Checker</h3>
+<p>UAE commercial license compliance validation for trade licenses, free zones, and restricted activities.</p>
+<pre><code class="language-bash">cd examples/compliance-checker && node index.js</code></pre>
+
+<h1 id="license">License</h1>
+<p>MIT © Abdullah Alkaabi</p>
+</div>
+
+<script>
+hljs.highlightAll();
+document.querySelectorAll('pre').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+  btn.onclick = () => {
+    navigator.clipboard.writeText(pre.querySelector('code').textContent);
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  };
+  pre.appendChild(btn);
+});
+</script>
+</body>
+</html>

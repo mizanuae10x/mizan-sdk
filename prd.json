@@ -1,0 +1,157 @@
+{
+  "project": "Mizan Framework SDK",
+  "description": "Developer SDK for building AI agents compliant with the Mizan Framework Neuro-Symbolic architecture. npm package @mizan/sdk with TypeScript support, CLI tools, adapters for OpenAI/Anthropic/Azure, and documentation site.",
+  "buildDir": "/Users/uae10x/.openclaw/workspace/projects/mizan-sdk",
+  "techStack": {
+    "language": "TypeScript + JavaScript (CommonJS + ESM)",
+    "packageManager": "npm",
+    "testing": "Jest",
+    "docs": "Single-page HTML documentation site",
+    "styling": "Navy #0B1F3A + Gold #D4AF37 — Mizan brand"
+  },
+  "userStories": [
+    {
+      "id": "US-01",
+      "title": "Core Package Structure",
+      "description": "npm package @mizan/sdk with proper package.json, TypeScript types, CommonJS + ESM exports",
+      "passes": false,
+      "acceptanceCriteria": [
+        "package.json with name @mizan/sdk, version 1.0.0",
+        "src/index.ts exports all public APIs",
+        "TypeScript types (.d.ts) generated",
+        "README.md with installation + quickstart",
+        "MIT license"
+      ]
+    },
+    {
+      "id": "US-02",
+      "title": "PolicyParser",
+      "description": "Parse policy text into structured rules using LLM. Input: raw text. Output: Rule[] array.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "PolicyParser class with parse(text: string): Promise<Rule[]>",
+        "Rule type: { id, name, condition, action, reason, priority }",
+        "Supports OpenAI + Anthropic adapters",
+        "Fallback: regex-based simple parser if no LLM key",
+        "parseFile(path) for reading .txt/.md files"
+      ]
+    },
+    {
+      "id": "US-03",
+      "title": "RuleEngine",
+      "description": "Deterministic rule evaluation engine. Input: facts object. Output: Decision with matched rule and reasoning chain.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "RuleEngine class with evaluate(facts: object): Decision",
+        "Decision type: { result, matchedRule, reason, score, auditId }",
+        "Result: APPROVED | REJECTED | REVIEW",
+        "Score: 0-100 based on matched rules",
+        "loadRules(rules: Rule[]) and addRule(rule: Rule)",
+        "detectConflicts(): Conflict[] method",
+        "Safe evaluation (no eval()) — uses compiled condition functions"
+      ]
+    },
+    {
+      "id": "US-04",
+      "title": "AuditLogger",
+      "description": "Immutable audit log for every decision. Append-only, exportable.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "AuditLogger class with log(decision: Decision): AuditEntry",
+        "AuditEntry: { id, timestamp, input, output, rule, hash }",
+        "SHA-256 hash chain (each entry hashes previous)",
+        "query(filter): AuditEntry[] with date/result filters",
+        "exportCSV(): string method",
+        "File-based storage (data/audit.jsonl)"
+      ]
+    },
+    {
+      "id": "US-05",
+      "title": "MizanAgent Base Class",
+      "description": "Base class for building Mizan-compliant AI agents with built-in governance layer.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "MizanAgent abstract class with run(input): AgentResponse",
+        "Built-in: pre-check rules before LLM call",
+        "Built-in: post-check LLM output against rules",
+        "Built-in: audit every decision automatically",
+        "Override: think(input) for custom LLM logic",
+        "AgentResponse: { output, decisions[], auditTrail }"
+      ]
+    },
+    {
+      "id": "US-06",
+      "title": "CLI Tool",
+      "description": "mizan CLI for initializing projects, validating rules, and running decisions from terminal.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "bin/mizan.js executable",
+        "mizan init → creates project scaffold (rules.json, .env.example, index.js)",
+        "mizan validate <rules.json> → checks for conflicts and syntax errors",
+        "mizan decide <rules.json> <facts.json> → runs engine and prints decision",
+        "mizan parse <policy.txt> → extracts rules using LLM",
+        "Colored output with chalk"
+      ]
+    },
+    {
+      "id": "US-07",
+      "title": "Adapters",
+      "description": "LLM provider adapters for OpenAI, Anthropic, and a mock adapter for testing.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "OpenAIAdapter: uses OPENAI_API_KEY env var",
+        "AnthropicAdapter: uses ANTHROPIC_API_KEY env var",
+        "MockAdapter: returns deterministic test responses",
+        "All adapters implement LLMAdapter interface: complete(prompt): Promise<string>",
+        "Auto-detect adapter from available env vars"
+      ]
+    },
+    {
+      "id": "US-08",
+      "title": "Documentation Site",
+      "description": "Single-page HTML docs site with quickstart, API reference, and live examples.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "docs/index.html — full documentation site",
+        "Mizan navy+gold branding",
+        "Sections: Installation, Quickstart, PolicyParser API, RuleEngine API, AuditLogger API, MizanAgent, CLI, Adapters",
+        "Syntax-highlighted code examples",
+        "Copy-to-clipboard on code blocks",
+        "Links to GitHub and npm"
+      ]
+    },
+    {
+      "id": "US-09",
+      "title": "Example Projects",
+      "description": "Two example implementations showing SDK in action.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "examples/investment-screener/ — Masdar-style investment rules example",
+        "examples/compliance-checker/ — UAE commercial license compliance example",
+        "Each has: index.js, rules.json, README.md",
+        "Run with: node index.js",
+        "Uses MockAdapter so no API key needed"
+      ]
+    },
+    {
+      "id": "US-10",
+      "title": "Tests",
+      "description": "Jest test suite covering core functionality.",
+      "passes": false,
+      "acceptanceCriteria": [
+        "tests/rule-engine.test.js — 5+ test cases",
+        "tests/audit-logger.test.js — 3+ test cases",
+        "tests/policy-parser.test.js — 3+ test cases (using MockAdapter)",
+        "npm test runs all tests",
+        "All tests pass"
+      ]
+    }
+  ],
+  "notes": [
+    "No eval() — compile conditions to safe functions using new Function() with sandbox",
+    "Pure TypeScript source, compiled to dist/ for distribution",
+    "Zero required dependencies — optional peer deps for LLM adapters",
+    "Works in Node.js 18+",
+    "After building: npm pack to create .tgz package"
+  ]
+}

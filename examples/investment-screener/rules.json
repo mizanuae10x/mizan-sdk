@@ -1,0 +1,7 @@
+[
+  { "id": "R1", "name": "Large UAE Investment", "condition": "country === 'AE' && amount >= 1000000", "action": "APPROVED", "reason": "UAE entity with significant investment", "priority": 1 },
+  { "id": "R2", "name": "Sanctioned Country", "condition": "sanctioned === true", "action": "REJECTED", "reason": "Entity from sanctioned jurisdiction", "priority": 0 },
+  { "id": "R3", "name": "Small Investment", "condition": "amount < 100000", "action": "REJECTED", "reason": "Below minimum investment threshold", "priority": 2 },
+  { "id": "R4", "name": "Foreign Large Investment", "condition": "country !== 'AE' && amount >= 500000", "action": "REVIEW", "reason": "Foreign entity — requires enhanced due diligence", "priority": 3 },
+  { "id": "R5", "name": "Green Energy Bonus", "condition": "sector === 'renewable' && amount >= 500000", "action": "APPROVED", "reason": "Green energy investment — fast-tracked", "priority": 1 }
+]
