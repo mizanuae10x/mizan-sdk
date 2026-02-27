@@ -13,6 +13,14 @@ const DECISIONS_FILE = path.join(DATA_DIR, 'decisions.json');
 const DEMO_FILE = path.join(DATA_DIR, 'demo.json');
 const AGENTS_FILE = path.join(DATA_DIR, 'agents.json');
 
+let ragEngine = null;
+try {
+  const { RAGEngine } = require('../dist/RAGEngine');
+  ragEngine = new RAGEngine(path.join(DATA_DIR, 'rag-store.json'));
+} catch (e) {
+  console.warn('RAG Engine not available (run npm run build first):', e.message);
+}
+
 // Ensure data dir
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -345,6 +353,47 @@ app.post('/api/compliance/pii', (req, res) => {
   if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(text)) findings.push({ type: 'Email Address', severity: 'MEDIUM', color: '#eab308' });
   if (/\b[A-Z]{1,3}\d{6,9}\b/.test(text)) findings.push({ type: 'Passport Number', severity: 'HIGH', color: '#ef4444' });
   res.json({ findings, clean: findings.length === 0 });
+});
+
+// ---- RAG ----
+app.get('/api/rag/stats', (req, res) => {
+  if (!ragEngine) return res.status(503).json({ error: 'RAG not available - run npm run build' });
+  res.json(ragEngine.getStats());
+});
+
+app.get('/api/rag/docs', (req, res) => {
+  if (!ragEngine) return res.status(503).json({ error: 'RAG not available - run npm run build' });
+  res.json(ragEngine.listDocuments());
+});
+
+app.post('/api/rag/ingest', async (req, res) => {
+  if (!ragEngine) return res.status(503).json({ error: 'RAG not available - run npm run build' });
+  try {
+    const { name, content } = req.body;
+    if (!name || !content) return res.status(400).json({ error: 'name and content required' });
+    const doc = await ragEngine.ingest(name, content);
+    res.json({ id: doc.id, name: doc.name, chunkCount: doc.chunks.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/rag/query', async (req, res) => {
+  if (!ragEngine) return res.status(503).json({ error: 'RAG not available - run npm run build' });
+  try {
+    const { query, topK = 3 } = req.body;
+    if (!query) return res.status(400).json({ error: 'query required' });
+    const result = await ragEngine.answer(query, topK);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/rag/docs/:id', (req, res) => {
+  if (!ragEngine) return res.status(503).json({ error: 'RAG not available - run npm run build' });
+  const ok = ragEngine.deleteDocument(req.params.id);
+  res.json({ deleted: ok });
 });
 
 // ---- AGENTS CRUD ----
