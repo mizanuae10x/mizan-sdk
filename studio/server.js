@@ -12,6 +12,7 @@ const RULES_FILE = path.join(DATA_DIR, 'rules.json');
 const DECISIONS_FILE = path.join(DATA_DIR, 'decisions.json');
 const DEMO_FILE = path.join(DATA_DIR, 'demo.json');
 const AGENTS_FILE = path.join(DATA_DIR, 'agents.json');
+const API_KEYS_FILE = path.join(DATA_DIR, 'api-keys.json');
 
 let ragEngine = null;
 try {
@@ -36,6 +37,145 @@ function writeJSON(file, data) {
 }
 function genId() {
   return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+function generateApiKey() {
+  return 'mzn_k_' + crypto.randomBytes(16).toString('hex');
+}
+function readKeys() {
+  try { return JSON.parse(fs.readFileSync(API_KEYS_FILE, 'utf8')); } catch { return {}; }
+}
+function writeKeys(data) {
+  fs.writeFileSync(API_KEYS_FILE, JSON.stringify(data, null, 2));
+}
+function normalizeAuthHeader(auth) {
+  if (!auth) return '';
+  const token = String(auth).trim();
+  if (!token) return '';
+  return token.startsWith('Bearer ') ? token.slice(7).trim() : token;
+}
+
+function requireApiKey(req, res, next) {
+  const auth = req.headers.authorization || req.headers['x-api-key'] || '';
+  const key = normalizeAuthHeader(auth);
+  if (!key) return res.status(401).json({ error: 'API key required' });
+
+  const keys = readKeys();
+  const keyData = keys[key];
+  if (!keyData) return res.status(403).json({ error: 'Invalid API key' });
+  if (req.params.id && keyData.agentId !== req.params.id) return res.status(403).json({ error: 'API key does not match this agent' });
+
+  keys[key].lastUsed = new Date().toISOString();
+  keys[key].callCount = (keys[key].callCount || 0) + 1;
+  writeKeys(keys);
+
+  req.agentId = keyData.agentId;
+  req.apiKey = key;
+  next();
+}
+
+async function runAgentChat(agentId, body = {}) {
+  const { message, session_id = 'default' } = body;
+  if (!message) return { status: 400, payload: { error: 'message required' } };
+
+  const agents = readJSON(AGENTS_FILE);
+  const agent = agents.find(a => a.id === agentId);
+  if (!agent) return { status: 404, payload: { error: 'Agent not found' } };
+
+  let ragContext = '';
+  let ragSources = [];
+  if (ragEngine && agent.useRag) {
+    const ragResult = await ragEngine.answer(message, 3);
+    ragContext = ragResult.sources.map((s, i) => `[${i + 1}] ${s.chunk.text}`).join('\n\n');
+    ragSources = ragResult.sources.map(s => ({
+      doc: s.chunk.docName,
+      score: Math.round(s.score * 100) / 100,
+      preview: s.chunk.text.slice(0, 150) + '...'
+    }));
+  }
+
+  let complianceReport = null;
+  const frameworks = agent.complianceFrameworks || [];
+  if (frameworks.length > 0) {
+    complianceReport = runComplianceCheck({ message }, frameworks, 'both');
+  }
+
+  const systemPrompt = agent.systemPrompt || 'You are a helpful AI assistant.';
+
+  let answer = '';
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    const https = require('https');
+    answer = await new Promise((resolve, reject) => {
+      const requestBody = JSON.stringify({
+        model: agent.model || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...(ragContext
+            ? [{ role: 'user', content: `Context:\n${ragContext}\n\nQuestion: ${message}` }]
+            : [{ role: 'user', content: message }])
+        ],
+        max_tokens: 800
+      });
+      const request = https.request({
+        hostname: 'api.openai.com',
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openaiKey}`,
+          'Content-Length': Buffer.byteLength(requestBody)
+        }
+      }, (response) => {
+        let raw = '';
+        response.on('data', chunk => { raw += chunk; });
+        response.on('end', () => {
+          try {
+            const parsed = JSON.parse(raw);
+            resolve(parsed.choices?.[0]?.message?.content || parsed.error?.message || 'No answer');
+          } catch (err) {
+            reject(err);
+          }
+        });
+      });
+      request.on('error', reject);
+      request.write(requestBody);
+      request.end();
+    });
+  } else {
+    answer = ragContext
+      ? `Based on my knowledge base:\n\n${ragSources.map((s, i) => `[${i + 1}] ${s.preview}`).join('\n\n')}`
+      : `I am ${agent.name}. You asked: "${message}". (Connect an OpenAI API key for full responses.)`;
+  }
+
+  const auditEntry = {
+    id: 'agt-' + Date.now().toString(36),
+    timestamp: new Date().toISOString(),
+    agentId,
+    agentName: agent.name,
+    input: { message, session_id },
+    output: answer,
+    ragSources,
+    complianceScore: complianceReport?.score ?? null,
+    hash: crypto.createHash('sha256').update(answer + message).digest('hex').slice(0, 16)
+  };
+
+  return {
+    status: 200,
+    payload: {
+      answer,
+      agentId,
+      agentName: agent.name,
+      sessionId: session_id,
+      sources: ragSources,
+      compliance: complianceReport ? {
+        score: complianceReport.score,
+        status: complianceReport.overallStatus,
+        summaryAr: complianceReport.summaryAr
+      } : null,
+      auditId: auditEntry.id,
+      auditHash: auditEntry.hash
+    }
+  };
 }
 
 // ---- RULES CRUD ----
@@ -480,6 +620,64 @@ app.delete('/api/agents/:id', (req, res) => {
   agents = agents.filter(a => a.id !== req.params.id);
   writeJSON(AGENTS_FILE, agents);
   res.json({ success: true });
+});
+
+app.post('/api/agents/:id/keys', (req, res) => {
+  const agents = readJSON(AGENTS_FILE);
+  const agent = agents.find(a => a.id === req.params.id);
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+  const key = generateApiKey();
+  const keys = readKeys();
+  keys[key] = {
+    id: key,
+    agentId: req.params.id,
+    agentName: agent.name,
+    name: req.body?.name || 'Default Key',
+    createdAt: new Date().toISOString(),
+    lastUsed: null,
+    callCount: 0
+  };
+  writeKeys(keys);
+  res.json({ key, agentId: req.params.id });
+});
+
+app.get('/api/agents/:id/keys', (req, res) => {
+  const keys = readKeys();
+  const agentKeys = Object.values(keys)
+    .filter(key => key.agentId === req.params.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const masked = agentKeys.map(key => ({ ...key, id: key.id.slice(0, 16) + '••••' }));
+  res.json(masked);
+});
+
+app.delete('/api/agents/:id/keys/:keyId', (req, res) => {
+  const keys = readKeys();
+  const prefix = req.params.keyId.replace(/••••$/, '');
+  const full = Object.keys(keys).find(key => key.startsWith(prefix) && keys[key].agentId === req.params.id);
+  if (!full) return res.status(404).json({ error: 'Key not found' });
+  delete keys[full];
+  writeKeys(keys);
+  res.json({ revoked: true });
+});
+
+app.post('/api/agents/:id/chat', requireApiKey, async (req, res) => {
+  try {
+    const result = await runAgentChat(req.params.id, req.body || {});
+    res.status(result.status).json(result.payload);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/agents/:id/chat/public', async (req, res) => {
+  const { message } = req.body || {};
+  if (!message) return res.status(400).json({ error: 'message required' });
+  res.json({
+    answer: `Agent ${req.params.id} received: "${message}". Add an API key for full access.`,
+    sources: [],
+    compliance: null
+  });
 });
 
 app.post('/api/agents/:id/run', async (req, res) => {

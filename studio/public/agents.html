@@ -90,6 +90,22 @@ h1{font-size:28px;margin-bottom:8px}
 .toast{position:fixed;top:20px;right:20px;padding:14px 24px;background:#34d399;color:#0B1F3A;border-radius:8px;font-weight:600;font-size:14px;z-index:200;display:none}
 .toast.show{display:block;animation:fadeIn .3s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.deploy-tabs{display:flex;gap:8px;border-bottom:1px solid rgba(212,175,55,.12);padding-bottom:12px;margin-bottom:16px}
+.deploy-tab{padding:8px 12px;border:1px solid rgba(212,175,55,.2);border-radius:8px;background:rgba(255,255,255,.03);color:rgba(255,255,255,.8);font-size:13px;cursor:pointer}
+.deploy-tab.active{background:rgba(212,175,55,.15);color:#D4AF37;border-color:rgba(212,175,55,.45)}
+.deploy-panel{display:none}
+.deploy-panel.active{display:block}
+.kv{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;margin-bottom:12px}
+.kv label{font-size:12px;color:rgba(255,255,255,.55)}
+.kv code{background:rgba(0,0,0,.35);padding:8px 10px;border-radius:6px;border:1px solid rgba(212,175,55,.2);font-size:12px;word-break:break-all}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.mono{font-family:'Courier New',monospace}
+.deploy-box{background:rgba(0,0,0,.25);border:1px solid rgba(212,175,55,.15);border-radius:10px;padding:12px;margin-top:12px}
+.test-chat{background:rgba(0,0,0,.3);border:1px solid rgba(212,175,55,.16);border-radius:10px;padding:12px}
+.test-messages{height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.test-msg{padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;max-width:90%}
+.test-user{background:#D4AF37;color:#0B1F3A;align-self:flex-end;font-weight:600}
+.test-bot{background:#152d4f;color:#dbe5f5;border:1px solid rgba(212,175,55,.2)}
 </style>
 </head>
 <body>
@@ -105,6 +121,7 @@ h1{font-size:28px;margin-bottom:8px}
     <a href="agents.html" class="active">&#129302; Agent Builder</a>
     <a href="compliance.html"><span>🇦🇪</span> UAE Compliance</a>
     <a href="rag.html"><span>📚</span> Knowledge Base</a>
+    <a href="widget-demo.html"><span>🔌</span> Widget Demo</a>
     <a href="setup.html">&#9881;&#65039; Setup</a>
   </nav>
   <div class="version">&#128230; v1.1.0</div>
@@ -282,10 +299,80 @@ h1{font-size:28px;margin-bottom:8px}
   </div>
 </div>
 
+<!-- DEPLOY MODAL -->
+<div class="modal-bg" id="deployModal">
+  <div class="modal" style="width:860px">
+    <h2 id="deployTitle">🚀 Deploy Agent</h2>
+    <p class="modal-subtitle" id="deploySubtitle">Configure API keys, website embed, and test chat.</p>
+
+    <div class="deploy-tabs">
+      <button class="deploy-tab active" onclick="setDeployTab('api')" id="tab-api">API</button>
+      <button class="deploy-tab" onclick="setDeployTab('embed')" id="tab-embed">Embed</button>
+      <button class="deploy-tab" onclick="setDeployTab('test')" id="tab-test">Test</button>
+    </div>
+
+    <div class="deploy-panel active" id="panel-api">
+      <div class="kv">
+        <label>API Endpoint</label>
+        <code id="apiEndpoint" class="mono"></code>
+        <button class="btn btn-outline btn-sm" onclick="copyApiEndpoint()">Copy URL</button>
+      </div>
+      <div class="kv">
+        <label>API Key</label>
+        <code id="apiKeyMask" class="mono">mzn_k_••••••••••••••••</code>
+        <div class="btn-row">
+          <button class="btn btn-sm" onclick="generateDeployKey()">Generate New Key</button>
+          <button class="btn btn-outline btn-sm" onclick="copyApiKey()">Copy</button>
+          <button class="btn btn-red btn-sm" onclick="revokeApiKey()">Revoke</button>
+        </div>
+      </div>
+      <div class="kv" style="grid-template-columns:150px 1fr">
+        <label>Usage</label>
+        <div id="apiStats" style="font-size:13px;color:rgba(255,255,255,.6)">Never used · 0 calls total</div>
+      </div>
+      <div class="deploy-box">
+        <div style="font-size:13px;color:#D4AF37;margin-bottom:8px">Example cURL</div>
+        <pre id="curlExample" class="mono" style="white-space:pre-wrap;font-size:12px;color:#d6e4fb"></pre>
+        <button class="btn btn-outline btn-sm" onclick="copyCurl()">Copy cURL</button>
+      </div>
+    </div>
+
+    <div class="deploy-panel" id="panel-embed">
+      <div class="deploy-box">
+        <div style="font-size:13px;color:#D4AF37;margin-bottom:8px">Embed Code</div>
+        <pre id="embedCode" class="mono" style="white-space:pre-wrap;font-size:12px;color:#d6e4fb"></pre>
+        <button class="btn btn-outline btn-sm" onclick="copyEmbed()">Copy HTML</button>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-green btn-sm" onclick="openWidgetDemo()">Live Widget Demo →</button>
+      </div>
+    </div>
+
+    <div class="deploy-panel" id="panel-test">
+      <div class="test-chat">
+        <div class="test-messages" id="testMessages">
+          <div class="test-msg test-bot">Messages appear here...</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="testInput" placeholder="Ask your agent anything..." style="flex:1;padding:10px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(212,175,55,.2);border-radius:8px;color:#fff">
+          <button class="btn btn-green btn-sm" onclick="sendDeployTest()" id="testSendBtn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-outline" onclick="hideDeployModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let selectedType = '';
 let currentRunId = '';
 let ruleCounter = 0;
+let currentDeployAgent = null;
+let latestFullKeys = {};
+let currentMaskedKey = '';
 
 function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
@@ -297,6 +384,165 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function timeAgo(iso) {
+  if (!iso) return 'Never';
+  var diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  var mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' hour' + (hrs !== 1 ? 's' : '') + ' ago';
+  var days = Math.floor(hrs / 24);
+  return days + ' day' + (days !== 1 ? 's' : '') + ' ago';
+}
+
+function hideDeployModal() { document.getElementById('deployModal').classList.remove('show'); }
+
+function setDeployTab(tab) {
+  ['api', 'embed', 'test'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    document.getElementById('panel-' + t).classList.toggle('active', t === tab);
+  });
+}
+
+function updateDeploySnippets() {
+  if (!currentDeployAgent) return;
+  var endpoint = location.origin + '/api/agents/' + currentDeployAgent.id + '/chat';
+  document.getElementById('apiEndpoint').textContent = endpoint;
+  var full = latestFullKeys[currentDeployAgent.id] || '';
+  var shown = full || currentMaskedKey || 'mzn_k_••••••••••••••••';
+  var curl = 'curl -X POST ' + endpoint + ' \\\\\\n  -H "Authorization: Bearer ' + shown + '" \\\\\\n  -H "Content-Type: application/json" \\\\\\n  -d \'{\"message\":\"Hello\"}\'';
+  document.getElementById('curlExample').textContent = curl;
+  var embed = '<script src=\"' + location.origin + '/widget.js\" data-agent=\"' + currentDeployAgent.id + '\" data-key=\"' + shown + '\" data-theme=\"navy\" data-lang=\"ar\"></script>';
+  document.getElementById('embedCode').textContent = embed;
+}
+
+function renderDeployApiStats(keyData) {
+  if (!keyData) {
+    document.getElementById('apiKeyMask').textContent = 'mzn_k_••••••••••••••••';
+    document.getElementById('apiStats').textContent = 'Never used · 0 calls total';
+    currentMaskedKey = '';
+  } else {
+    document.getElementById('apiKeyMask').textContent = keyData.id;
+    document.getElementById('apiStats').textContent = (keyData.lastUsed ? timeAgo(keyData.lastUsed) : 'Never used') + ' · ' + (keyData.callCount || 0) + ' calls total';
+    currentMaskedKey = keyData.id;
+  }
+  updateDeploySnippets();
+}
+
+async function loadDeployKeys() {
+  if (!currentDeployAgent) return;
+  var keys = await (await fetch('/api/agents/' + currentDeployAgent.id + '/keys')).json();
+  renderDeployApiStats(keys[0]);
+}
+
+async function showDeployModal(id, name) {
+  currentDeployAgent = { id: id, name: name };
+  document.getElementById('deployTitle').textContent = '🚀 Deploy: ' + name;
+  document.getElementById('deploySubtitle').textContent = 'API, embed snippet, and live test panel for ' + name + '.';
+  document.getElementById('testMessages').innerHTML = '<div class=\"test-msg test-bot\">Messages appear here...</div>';
+  document.getElementById('testInput').value = '';
+  setDeployTab('api');
+  updateDeploySnippets();
+  await loadDeployKeys();
+  document.getElementById('deployModal').classList.add('show');
+}
+
+async function generateDeployKey() {
+  if (!currentDeployAgent) return;
+  var name = prompt('Key name', 'Production Key') || 'Production Key';
+  var res = await fetch('/api/agents/' + currentDeployAgent.id + '/keys', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name })
+  });
+  var data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  latestFullKeys[currentDeployAgent.id] = data.key;
+  await loadDeployKeys();
+  showToast('API key generated');
+}
+
+function copyApiEndpoint() {
+  navigator.clipboard.writeText(document.getElementById('apiEndpoint').textContent);
+  showToast('Endpoint copied');
+}
+
+function copyApiKey() {
+  if (!currentDeployAgent) return;
+  var val = latestFullKeys[currentDeployAgent.id] || currentMaskedKey || '';
+  if (!val) { alert('Generate a key first'); return; }
+  navigator.clipboard.writeText(val);
+  showToast('API key copied');
+}
+
+async function revokeApiKey() {
+  if (!currentDeployAgent || !currentMaskedKey) { alert('No key to revoke'); return; }
+  if (!confirm('Revoke this API key?')) return;
+  var res = await fetch('/api/agents/' + currentDeployAgent.id + '/keys/' + encodeURIComponent(currentMaskedKey), { method: 'DELETE' });
+  var data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  latestFullKeys[currentDeployAgent.id] = '';
+  await loadDeployKeys();
+  showToast('Key revoked');
+}
+
+function copyCurl() {
+  navigator.clipboard.writeText(document.getElementById('curlExample').textContent);
+  showToast('cURL copied');
+}
+
+function copyEmbed() {
+  navigator.clipboard.writeText(document.getElementById('embedCode').textContent);
+  showToast('Embed HTML copied');
+}
+
+function openWidgetDemo() {
+  window.open('widget-demo.html', '_blank');
+}
+
+function addTestMessage(text, who) {
+  var wrap = document.getElementById('testMessages');
+  var div = document.createElement('div');
+  div.className = 'test-msg ' + (who === 'user' ? 'test-user' : 'test-bot');
+  div.textContent = text;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendDeployTest() {
+  if (!currentDeployAgent) return;
+  var input = document.getElementById('testInput');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  addTestMessage(msg, 'user');
+  var btn = document.getElementById('testSendBtn');
+  btn.disabled = true;
+  addTestMessage('Thinking...', 'bot');
+  var wrap = document.getElementById('testMessages');
+  var typing = wrap.lastElementChild;
+  try {
+    var full = latestFullKeys[currentDeployAgent.id] || '';
+    var endpoint = full ? '/api/agents/' + currentDeployAgent.id + '/chat' : '/api/agents/' + currentDeployAgent.id + '/chat/public';
+    var resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(full ? { Authorization: 'Bearer ' + full } : {})
+      },
+      body: JSON.stringify({ message: msg, session_id: 'studio-test-' + Date.now() })
+    });
+    var data = await resp.json();
+    typing.remove();
+    addTestMessage(data.answer || data.error || 'No response', 'bot');
+  } catch (e) {
+    typing.remove();
+    addTestMessage('Connection error. Please try again.', 'bot');
+  }
+  btn.disabled = false;
 }
 
 function selectType(el) {
@@ -396,6 +642,7 @@ async function createAgent() {
   hideCreateModal();
   showToast('Agent "' + name + '" created!');
   loadAgents();
+  showDeployModal(agent.id, agent.name || name);
 }
 
 function showRunModal(id, name) {
@@ -482,7 +729,7 @@ async function loadAgents() {
     var ruleCount = (a.rules || []).length;
     var lastAct = a.lastActivity ? new Date(a.lastActivity).toLocaleString() : 'Never';
     var safeName = (a.name || '').replace(/'/g, "\\'");
-    return '<div class="agent-card">' +
+    return '<div class="agent-card" style="cursor:pointer" onclick="showDeployModal(\'' + a.id + '\',\'' + safeName + '\')">' +
       '<div class="card-header"><h3>' + a.name + '</h3><span class="type-badge ' + typeClass + '">' + (a.type || 'custom') + '</span></div>' +
       '<div class="desc">' + (a.description || 'No description') + '</div>' +
       '<div class="meta">' +
@@ -494,15 +741,22 @@ async function loadAgents() {
         '<span>&#129302; ' + (a.model || 'gpt-4o-mini') + '</span>' +
       '</div>' +
       '<div class="actions">' +
-        '<button class="btn btn-green btn-sm" onclick="showRunModal(\'' + a.id + '\',\'' + safeName + '\')">&#9654; Run</button>' +
-        '<button class="btn btn-outline btn-sm" onclick="showCodeModal(\'' + a.id + '\',\'' + safeName + '\')">&#128196; Code</button>' +
-        '<button class="btn btn-red btn-sm" onclick="deleteAgent(\'' + a.id + '\',\'' + safeName + '\')">&#128465; Delete</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showDeployModal(\'' + a.id + '\',\'' + safeName + '\')">🚀 Deploy</button>' +
+        '<button class="btn btn-green btn-sm" onclick="event.stopPropagation();showRunModal(\'' + a.id + '\',\'' + safeName + '\')">&#9654; Run</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showCodeModal(\'' + a.id + '\',\'' + safeName + '\')">&#128196; Code</button>' +
+        '<button class="btn btn-red btn-sm" onclick="event.stopPropagation();deleteAgent(\'' + a.id + '\',\'' + safeName + '\')">&#128465; Delete</button>' +
       '</div>' +
     '</div>';
   }).join('');
 }
 
 loadAgents();
+document.getElementById('testInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendDeployTest();
+  }
+});
 </script>
 </body>
 </html>
