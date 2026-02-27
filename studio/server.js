@@ -114,12 +114,16 @@ app.get('/api/conflicts', (req, res) => {
 });
 
 // ---- DEMO ----
+const DEMO_RULES = [
+  {"id":"d1","name":"Budget Threshold","condition":"budget >= 100000","action":"APPROVED","reason":"Budget meets minimum threshold","priority":1,"active":true},
+  {"id":"d2","name":"Unauthorized Vendor","condition":"vendor_blacklisted == true","action":"REJECTED","reason":"Vendor is on the blacklist","priority":0,"active":true},
+  {"id":"d3","name":"Foreign Entity Review","condition":"entity_type == 'foreign'","action":"REVIEW","reason":"Foreign entities require additional review","priority":2,"active":true},
+  {"id":"d4","name":"Emergency Fast-Track","condition":"priority == 'emergency' && budget <= 500000","action":"APPROVED","reason":"Emergency procurement fast-tracked","priority":1,"active":true},
+  {"id":"d5","name":"High Risk Amount","condition":"budget >= 10000000","action":"REVIEW","reason":"High-value transaction requires board approval","priority":2,"active":true}
+];
 app.post('/api/demo/load', (req, res) => {
-  try {
-    const demo = JSON.parse(fs.readFileSync(DEMO_FILE, 'utf8'));
-    writeJSON(RULES_FILE, demo);
-    return res.json({ success: true, rulesLoaded: demo.length });
-  } catch (e) { return res.status(500).json({ error: e.message }); }
+  writeJSON(RULES_FILE, DEMO_RULES);
+  res.json({ success: true, rulesLoaded: DEMO_RULES.length });
 });
 
 // ---- STATS ----
