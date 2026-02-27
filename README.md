@@ -55,6 +55,75 @@ main();
 
 ## Features
 
+### UAE AI Governance Compliance
+
+`@mizan/sdk` now includes a UAE compliance layer for AI workflows:
+
+- `PDPL` (UAE Federal Decree-Law No. 45/2021): consent, minimization, residency/transfer checks
+- `UAE_AI_ETHICS`: inclusiveness, reliability, transparency, privacy, security, accountability
+- `NESA`: audit/logging integrity, incident and data classification, access and encryption controls
+- `DUBAI_AI_LAW`: framework hook for Dubai-specific governance review
+
+Quick start:
+
+```ts
+import { MizanAgent, UAEComplianceLayer, MockAdapter, Rule } from '@mizan/sdk';
+
+class ComplianceAgent extends MizanAgent {
+  async think(input: Record<string, unknown>): Promise<string> {
+    if (this.adapter) return this.adapter.complete(JSON.stringify(input));
+    return 'No adapter configured.';
+  }
+}
+
+const compliance = new UAEComplianceLayer({
+  frameworks: ['PDPL', 'UAE_AI_ETHICS', 'NESA'],
+  language: 'both',
+  auditLevel: 'full',
+  dataResidency: 'UAE',
+});
+
+const rules: Rule[] = [
+  { id: 'R001', name: 'High Risk Block', condition: 'risk > 0.8', action: 'REJECTED', reason: 'Risk threshold exceeded', priority: 1 },
+];
+
+const agent = new ComplianceAgent({
+  adapter: new MockAdapter('Loan application queued for review.'),
+  rules,
+  compliance,
+});
+
+const response = await agent.run({
+  userId: 'U123',
+  action: 'loan_application',
+  amount: 50000,
+  risk: 0.4,
+  purpose: 'credit_assessment',
+  consent: true,
+  dataResidency: 'UAE',
+});
+
+console.log('Decision:', response.decisions[0].result);
+console.log('Compliance Score:', response.decisions[0].complianceReport?.score);
+console.log('Arabic Summary:', response.decisions[0].complianceReport?.summaryAr);
+```
+
+`ComplianceCheck` fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `framework` | `UAEFramework` | Framework source of the check (`PDPL`, `UAE_AI_ETHICS`, `NESA`, etc.) |
+| `article` | `string` | Article/control reference (e.g., `Art. 6`, `AC-01`) |
+| `status` | `ComplianceStatus` | `COMPLIANT`, `NON_COMPLIANT`, or `REVIEW_REQUIRED` |
+| `requirement` | `string` | English requirement text |
+| `requirementAr` | `string` | Arabic requirement text |
+| `passed` | `boolean` | Pass/fail result for the check |
+| `details` | `string` | Execution details and evidence summary |
+| `remediation` | `string` | English remediation guidance |
+| `remediationAr` | `string` | Arabic remediation guidance |
+
+See full runnable example: [`examples/uae-compliance.ts`](./examples/uae-compliance.ts)
+
 ### 🔧 Tool System
 
 Register tools that your agent can use during execution:

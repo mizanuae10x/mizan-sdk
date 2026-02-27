@@ -1,3 +1,5 @@
+import type { UAEComplianceReport } from './compliance';
+
 export interface Rule {
   id: string;
   name: string;
@@ -13,6 +15,7 @@ export interface Decision {
   reason: string;
   score: number;
   auditId: string;
+  complianceReport?: UAEComplianceReport;
 }
 
 export interface AuditEntry {
@@ -23,6 +26,7 @@ export interface AuditEntry {
   rule: Rule | null;
   hash: string;
   previousHash: string;
+  compliance?: UAEComplianceReport;
 }
 
 export interface Conflict {

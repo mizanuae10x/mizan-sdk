@@ -4,6 +4,7 @@ import { AuditLogger } from './AuditLogger';
 import { ToolRegistry, Tool, ToolResult } from './ToolRegistry';
 import { MemoryModule, MemoryEntry } from './MemoryModule';
 import { config } from './config';
+import { UAEComplianceLayer } from './compliance';
 
 export abstract class MizanAgent {
   protected engine: RuleEngine;
@@ -11,18 +12,21 @@ export abstract class MizanAgent {
   protected adapter: LLMAdapter | null;
   protected tools: ToolRegistry;
   protected memory: MemoryModule;
+  protected compliance: UAEComplianceLayer | null;
 
   constructor(options?: {
     rules?: Rule[];
     adapter?: LLMAdapter;
     auditPath?: string;
     memoryPath?: string;
+    compliance?: UAEComplianceLayer;
   }) {
     this.engine = new RuleEngine();
     this.logger = new AuditLogger(options?.auditPath || config.auditPath);
     this.adapter = options?.adapter || null;
     this.tools = new ToolRegistry();
     this.memory = new MemoryModule({ path: options?.memoryPath });
+    this.compliance = options?.compliance || null;
 
     if (options?.rules) {
       this.engine.loadRules(options.rules);
@@ -55,7 +59,9 @@ export abstract class MizanAgent {
     // Pre-check
     const preDecision = this.engine.evaluate(input);
     decisions.push(preDecision);
-    auditTrail.push(this.logger.log(preDecision, input));
+    const preAudit = this.logger.log(preDecision, input);
+    this.applyCompliance(input, preDecision, preAudit);
+    auditTrail.push(preAudit);
 
     if (preDecision.result === 'REJECTED') {
       return {
@@ -72,7 +78,9 @@ export abstract class MizanAgent {
     const postFacts = { ...input, llmOutput: output };
     const postDecision = this.engine.evaluate(postFacts);
     decisions.push(postDecision);
-    auditTrail.push(this.logger.log(postDecision, postFacts));
+    const postAudit = this.logger.log(postDecision, postFacts);
+    this.applyCompliance(postFacts, postDecision, postAudit);
+    auditTrail.push(postAudit);
 
     return { output, decisions, auditTrail };
   }
@@ -84,6 +92,9 @@ export abstract class MizanAgent {
   ): Promise<void> {
     // Pre-check
     const preDecision = this.engine.evaluate(input);
+    const preAudit = this.logger.log(preDecision, input);
+    this.applyCompliance(input, preDecision, preAudit);
+
     if (preDecision.result === 'REJECTED') {
       const msg = `Blocked by rule: ${preDecision.reason}`;
       onChunk(msg);
@@ -91,7 +102,7 @@ export abstract class MizanAgent {
         onDone({
           output: msg,
           decisions: [preDecision],
-          auditTrail: [this.logger.log(preDecision, input)],
+          auditTrail: [preAudit],
         });
       }
       return;
@@ -110,14 +121,13 @@ export abstract class MizanAgent {
       const output = chunks.join('');
       const postFacts = { ...input, llmOutput: output };
       const postDecision = this.engine.evaluate(postFacts);
+      const postAudit = this.logger.log(postDecision, postFacts);
+      this.applyCompliance(postFacts, postDecision, postAudit);
       if (onDone) {
         onDone({
           output,
           decisions: [preDecision, postDecision],
-          auditTrail: [
-            this.logger.log(preDecision, input),
-            this.logger.log(postDecision, postFacts),
-          ],
+          auditTrail: [preAudit, postAudit],
         });
       }
       return;
@@ -132,15 +142,21 @@ export abstract class MizanAgent {
 
     const postFacts = { ...input, llmOutput: output };
     const postDecision = this.engine.evaluate(postFacts);
+    const postAudit = this.logger.log(postDecision, postFacts);
+    this.applyCompliance(postFacts, postDecision, postAudit);
     if (onDone) {
       onDone({
         output,
         decisions: [preDecision, postDecision],
-        auditTrail: [
-          this.logger.log(preDecision, input),
-          this.logger.log(postDecision, postFacts),
-        ],
+        auditTrail: [preAudit, postAudit],
       });
     }
+  }
+
+  private applyCompliance(input: Record<string, unknown>, decision: Decision, auditEntry: AuditEntry): void {
+    if (!this.compliance) return;
+    const report = this.compliance.evaluate(input, decision, auditEntry);
+    decision.complianceReport = report;
+    auditEntry.compliance = report;
   }
 }

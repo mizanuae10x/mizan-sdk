@@ -7,6 +7,8 @@ export { MemoryModule } from './MemoryModule';
 export { config } from './config';
 export { OpenAIAdapter, AnthropicAdapter, MockAdapter, autoDetectAdapter } from './adapters';
 export { webSearchTool, calculatorTool, dateTimeTool, httpTool, fileReaderTool } from './tools';
+export { UAEComplianceLayer, PDPLChecker, AIEthicsGuardrails, NESAControls } from './compliance';
 export type { Rule, Decision, AuditEntry, Conflict, AgentResponse, LLMAdapter } from './types';
 export type { Tool, ToolResult } from './ToolRegistry';
 export type { MemoryEntry } from './MemoryModule';
+export type { UAEComplianceConfig, UAEComplianceReport, ComplianceCheck, UAEFramework } from './compliance';
