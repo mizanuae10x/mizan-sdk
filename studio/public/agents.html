@@ -106,6 +106,29 @@ h1{font-size:28px;margin-bottom:8px}
 .test-msg{padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.5;max-width:90%}
 .test-user{background:#D4AF37;color:#0B1F3A;align-self:flex-end;font-weight:600}
 .test-bot{background:#152d4f;color:#dbe5f5;border:1px solid rgba(212,175,55,.2)}
+.prompt-templates{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.tmpl-btn{background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);color:#D4AF37;padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;transition:.2s}
+.tmpl-btn:hover{background:rgba(212,175,55,.18)}
+.char-count{font-size:11px;color:rgba(255,255,255,.3);text-align:right;margin-top:4px}
+.toggle-row{display:flex;align-items:center;gap:12px}
+.toggle-switch{position:relative;display:inline-block;width:44px;height:24px}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:#1e3a5f;border-radius:24px;transition:.3s}
+.toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.toggle-switch input:checked + .toggle-slider{background:#D4AF37}
+.toggle-switch input:checked + .toggle-slider:before{transform:translateX(20px)}
+.checkbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.check-item{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border-radius:8px;border:1px solid rgba(212,175,55,.12);background:rgba(255,255,255,.03);font-size:13px}
+.check-item:hover{border-color:rgba(212,175,55,.3);background:rgba(212,175,55,.05)}
+.check-item input{accent-color:#D4AF37;width:14px;height:14px}
+.check-label{display:flex;flex-direction:column}
+.check-label small{font-size:10px;color:#6b82a8}
+.prompt-preview{font-size:11px;color:rgba(255,255,255,.35);font-style:italic;margin:4px 0;height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.agent-badges{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.badge-rag{background:rgba(52,211,153,.15);color:#34d399;font-size:10px;padding:2px 7px;border-radius:10px}
+.badge-pdpl{background:rgba(59,130,246,.15);color:#60a5fa;font-size:10px;padding:2px 7px;border-radius:10px}
+.badge-ethics{background:rgba(168,85,247,.15);color:#c084fc;font-size:10px;padding:2px 7px;border-radius:10px}
+.badge-nesa{background:rgba(249,115,22,.15);color:#fb923c;font-size:10px;padding:2px 7px;border-radius:10px}
 </style>
 </head>
 <body>
@@ -191,71 +214,109 @@ h1{font-size:28px;margin-bottom:8px}
       </div>
     </div>
 
-    <div class="section-title" style="margin-top:24px">3. Tools</div>
-    <div class="tools-grid" id="toolsGrid">
-      <div class="tool-check" onclick="toggleTool(this)">
-        <input type="checkbox" value="webSearchTool">
-        <div><div class="tname">&#127760; Web Search</div><div class="tdesc2">Search the internet</div></div>
+    <div class="section-title" style="margin-top:24px">3. Model Selection</div>
+    <div class="form-group">
+      <label>Model</label>
+      <select id="agentModel" class="form-input">
+        <option value="gpt-4o-mini">GPT-4o Mini (Fast, Cheap)</option>
+        <option value="gpt-4o">GPT-4o (Balanced)</option>
+        <option value="gpt-4-turbo">GPT-4 Turbo (Powerful)</option>
+        <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+        <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+      </select>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">4. System Prompt</div>
+    <div class="form-group">
+      <label>System Prompt <span style="color:#D4AF37">&#9733;</span></label>
+      <div class="prompt-templates">
+        <button type="button" class="tmpl-btn" onclick="setTemplate('gov')">&#127963;&#65039; Government</button>
+        <button type="button" class="tmpl-btn" onclick="setTemplate('legal')">&#9878;&#65039; Legal</button>
+        <button type="button" class="tmpl-btn" onclick="setTemplate('compliance')">&#128737;&#65039; Compliance</button>
+        <button type="button" class="tmpl-btn" onclick="setTemplate('assistant')">&#129302; Assistant</button>
       </div>
-      <div class="tool-check" onclick="toggleTool(this)">
-        <input type="checkbox" value="calculatorTool">
-        <div><div class="tname">&#129518; Calculator</div><div class="tdesc2">Math expressions</div></div>
+      <textarea id="agentSystemPrompt" class="form-input" rows="6" placeholder="You are a helpful AI assistant specialized in UAE government policy..."></textarea>
+      <div class="char-count" id="promptCharCount">0 / 2000</div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">5. Knowledge Base</div>
+    <div class="form-group">
+      <label>Knowledge Base (RAG)</label>
+      <div class="toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="agentUseRag" onchange="toggleRagSelect()">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="ragToggleLabel" style="font-size:13px;color:rgba(255,255,255,.6)">Connect to Knowledge Base</span>
       </div>
-      <div class="tool-check" onclick="toggleTool(this)">
-        <input type="checkbox" value="dateTimeTool">
-        <div><div class="tname">&#128197; Date/Time</div><div class="tdesc2">Current date &amp; time</div></div>
-      </div>
-      <div class="tool-check" onclick="toggleTool(this)">
-        <input type="checkbox" value="httpTool">
-        <div><div class="tname">&#128279; HTTP Request</div><div class="tdesc2">Call external APIs</div></div>
-      </div>
-      <div class="tool-check" onclick="toggleTool(this)">
-        <input type="checkbox" value="fileReaderTool">
-        <div><div class="tname">&#128196; File Reader</div><div class="tdesc2">Read local files</div></div>
+      <div id="ragSelectArea" style="display:none;margin-top:10px">
+        <select id="agentRagKb" class="form-input">
+          <option value="">Loading knowledge bases...</option>
+        </select>
+        <div style="font-size:12px;color:#6b82a8;margin-top:4px">Agent will search documents before answering</div>
       </div>
     </div>
 
-    <div class="section-title" style="margin-top:24px">4. Governance Rules <span style="font-weight:400;color:rgba(255,255,255,.3)">(optional)</span></div>
+    <div class="section-title" style="margin-top:24px">6. UAE Compliance Frameworks</div>
+    <div class="form-group">
+      <label>UAE Compliance Frameworks</label>
+      <div class="checkbox-grid">
+        <label class="check-item">
+          <input type="checkbox" name="compliance" value="PDPL">
+          <span class="check-label">&#128274; PDPL <small>Federal Law 45/2021</small></span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" name="compliance" value="UAE_AI_ETHICS">
+          <span class="check-label">&#129504; UAE AI Ethics <small>6 Principles</small></span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" name="compliance" value="NESA">
+          <span class="check-label">&#128737;&#65039; NESA <small>Cybersecurity Controls</small></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">7. Tools Selection</div>
+    <div class="form-group">
+      <label>Built-in Tools</label>
+      <div class="checkbox-grid">
+        <label class="check-item">
+          <input type="checkbox" name="tools" value="web_search" checked>
+          <span class="check-label">&#128269; Web Search</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" name="tools" value="calculator">
+          <span class="check-label">&#129518; Calculator</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" name="tools" value="datetime">
+          <span class="check-label">&#128197; Date &amp; Time</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" name="tools" value="http">
+          <span class="check-label">&#127760; HTTP Requests</span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" name="tools" value="file_reader">
+          <span class="check-label">&#128196; File Reader</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">8. Language &amp; Tone</div>
+    <div class="form-group">
+      <label>Response Language</label>
+      <div style="display:flex;gap:10px">
+        <label class="check-item"><input type="radio" name="agentLang" value="en" checked> English</label>
+        <label class="check-item"><input type="radio" name="agentLang" value="ar"> العربية</label>
+        <label class="check-item"><input type="radio" name="agentLang" value="both"> Both</label>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">9. Governance Rules <span style="font-weight:400;color:rgba(255,255,255,.3)">(optional)</span></div>
     <div id="rulesContainer">
       <div id="rulesList"></div>
       <button class="btn btn-outline btn-sm" onclick="addRuleRow()" style="margin-top:4px">+ Add Rule</button>
-    </div>
-
-    <div class="section-title" style="margin-top:24px">5. LLM Model</div>
-    <div class="form-group">
-      <select id="agentModel">
-        <optgroup label="OpenAI — GPT-5">
-          <option value="gpt-5.2">GPT-5.2 (newest, most capable)</option>
-        </optgroup>
-        <optgroup label="OpenAI — GPT-4o">
-          <option value="gpt-4o">GPT-4o (flagship)</option>
-          <option value="gpt-4o-mini" selected>GPT-4o Mini (fast, affordable)</option>
-        </optgroup>
-        <optgroup label="OpenAI — o-series (Reasoning)">
-          <option value="o3">o3 (most powerful reasoning)</option>
-          <option value="o3-mini">o3-mini (fast reasoning)</option>
-          <option value="o4-mini">o4-mini (newest reasoning)</option>
-          <option value="o1">o1 (advanced reasoning)</option>
-          <option value="o1-mini">o1-mini (fast reasoning)</option>
-          <option value="o1-preview">o1-preview</option>
-        </optgroup>
-        <optgroup label="OpenAI — GPT-4.1">
-          <option value="gpt-4.1">GPT-4.1 (latest)</option>
-          <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-          <option value="gpt-4.1-nano">GPT-4.1 Nano (fastest)</option>
-        </optgroup>
-        <optgroup label="OpenAI — Legacy">
-          <option value="gpt-4-turbo">GPT-4 Turbo</option>
-          <option value="gpt-4">GPT-4</option>
-          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-        </optgroup>
-        <optgroup label="Anthropic — Claude">
-          <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-          <option value="claude-opus-4-20250514">Claude Opus 4</option>
-          <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-          <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (fast)</option>
-        </optgroup>
-      </select>
     </div>
 
     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;padding-top:16px;border-top:1px solid rgba(212,175,55,.1)">
@@ -373,6 +434,12 @@ let ruleCounter = 0;
 let currentDeployAgent = null;
 let latestFullKeys = {};
 let currentMaskedKey = '';
+const PROMPT_TEMPLATES = {
+  gov: 'You are a UAE government policy expert. You provide accurate, evidence-based answers about UAE laws, regulations, and government initiatives. Always cite specific laws and articles. Respond formally in Arabic or English as needed. Never speculate — if uncertain, say "يحتاج تحقق" (Needs verification).',
+  legal: 'You are a UAE legal research assistant. You help analyze laws, regulations, and legal documents. Provide structured analysis with article references. Always include a disclaimer that this is not legal advice. Reference UAE Federal Laws, Ministerial Decrees, and Cabinet Resolutions accurately.',
+  compliance: 'You are a UAE AI governance and compliance specialist. You evaluate AI systems, processes, and decisions against UAE frameworks including PDPL (Federal Law 45/2021), UAE AI Ethics Principles, and NESA cybersecurity controls. Provide actionable recommendations with specific article references.',
+  assistant: 'You are a helpful, professional AI assistant for the UAE government and public sector. You are knowledgeable about UAE culture, values, and government structure. You respond clearly and concisely. When asked about sensitive topics, you defer to official sources.'
+};
 
 function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
@@ -573,6 +640,54 @@ function toggleTool(el) {
   else el.classList.remove('checked');
 }
 
+function setTemplate(key) {
+  var ta = document.getElementById('agentSystemPrompt');
+  ta.value = PROMPT_TEMPLATES[key] || '';
+  updateCharCount();
+  ta.focus();
+}
+
+function updateCharCount() {
+  var ta = document.getElementById('agentSystemPrompt');
+  var count = ta.value.length;
+  var el = document.getElementById('promptCharCount');
+  if (el) {
+    el.textContent = count + ' / 2000';
+    el.style.color = count > 1800 ? '#ef4444' : count > 1500 ? '#f59e0b' : 'rgba(255,255,255,.3)';
+  }
+}
+
+function toggleRagSelect() {
+  var cb = document.getElementById('agentUseRag');
+  var area = document.getElementById('ragSelectArea');
+  var label = document.getElementById('ragToggleLabel');
+  if (cb.checked) {
+    area.style.display = 'block';
+    label.textContent = 'Connected to Knowledge Base';
+    label.style.color = '#34d399';
+    loadRagDocs();
+  } else {
+    area.style.display = 'none';
+    label.textContent = 'Connect to Knowledge Base';
+    label.style.color = 'rgba(255,255,255,.6)';
+  }
+}
+
+async function loadRagDocs() {
+  try {
+    var docs = await (await fetch('/api/rag/docs')).json();
+    var sel = document.getElementById('agentRagKb');
+    if (!docs.length) {
+      sel.innerHTML = '<option value="">No documents yet — upload in Knowledge Base</option>';
+    } else {
+      sel.innerHTML = '<option value="all">All Documents (' + docs.length + ')</option>' +
+        docs.map(function(d) { return '<option value="' + d.id + '">' + d.name + ' (' + d.chunkCount + ' chunks)</option>'; }).join('');
+    }
+  } catch(e) {
+    document.getElementById('agentRagKb').innerHTML = '<option value="">Could not load docs</option>';
+  }
+}
+
 function addRuleRow(rule) {
   ruleCounter++;
   var div = document.createElement('div');
@@ -605,13 +720,20 @@ function showCreateModal() {
   document.getElementById('createModal').classList.add('show');
   document.getElementById('agentName').value = '';
   document.getElementById('agentDesc').value = '';
+  document.getElementById('agentSystemPrompt').value = '';
   document.getElementById('agentModel').value = 'gpt-4o-mini';
+  document.getElementById('agentUseRag').checked = false;
+  document.getElementById('ragSelectArea').style.display = 'none';
+  document.getElementById('ragToggleLabel').textContent = 'Connect to Knowledge Base';
+  document.getElementById('ragToggleLabel').style.color = 'rgba(255,255,255,.6)';
+  document.getElementById('agentRagKb').innerHTML = '<option value="">Loading knowledge bases...</option>';
+  document.querySelectorAll('input[name="compliance"]').forEach(function(el){ el.checked = false; });
+  document.querySelectorAll('input[name="tools"]').forEach(function(el, i){ el.checked = i === 0; });
+  var langInput = document.querySelector('input[name="agentLang"][value="en"]');
+  if (langInput) langInput.checked = true;
+  updateCharCount();
   selectedType = '';
   document.querySelectorAll('.type-option').forEach(function(o){ o.classList.remove('selected'); });
-  document.querySelectorAll('.tool-check').forEach(function(tc) {
-    tc.querySelector('input').checked = false;
-    tc.classList.remove('checked');
-  });
   document.getElementById('rulesList').innerHTML = '';
   ruleCounter = 0;
 }
@@ -623,14 +745,17 @@ async function createAgent() {
   if (!name) { alert('Please enter an agent name'); return; }
   if (!selectedType) { alert('Please select an agent type'); return; }
 
-  var tools = [];
-  document.querySelectorAll('.tool-check input:checked').forEach(function(cb){ tools.push(cb.value); });
-
   var body = {
     name: name, type: selectedType,
     description: document.getElementById('agentDesc').value.trim(),
-    model: document.getElementById('agentModel').value,
-    tools: tools, rules: getRules()
+    systemPrompt: (document.getElementById('agentSystemPrompt') && document.getElementById('agentSystemPrompt').value.trim()) || '',
+    model: (document.getElementById('agentModel') && document.getElementById('agentModel').value) || 'gpt-4o-mini',
+    useRag: (document.getElementById('agentUseRag') && document.getElementById('agentUseRag').checked) || false,
+    ragKnowledgeBase: (document.getElementById('agentRagKb') && document.getElementById('agentRagKb').value) || '',
+    complianceFrameworks: Array.from(document.querySelectorAll('input[name="compliance"]:checked')).map(function(el){ return el.value; }),
+    tools: Array.from(document.querySelectorAll('input[name="tools"]:checked')).map(function(el){ return el.value; }),
+    language: (document.querySelector('input[name="agentLang"]:checked') || {}).value || 'en',
+    rules: getRules()
   };
 
   var res = await fetch('/api/agents', {
@@ -729,9 +854,19 @@ async function loadAgents() {
     var ruleCount = (a.rules || []).length;
     var lastAct = a.lastActivity ? new Date(a.lastActivity).toLocaleString() : 'Never';
     var safeName = (a.name || '').replace(/'/g, "\\'");
+    var promptPreview = (a.systemPrompt || '').trim();
+    promptPreview = promptPreview ? promptPreview.slice(0, 60) + (promptPreview.length > 60 ? '...' : '') : '';
+    var badges = [];
+    if (a.useRag) badges.push('<span class="badge-rag">📚 RAG</span>');
+    var frameworks = a.complianceFrameworks || [];
+    if (frameworks.indexOf('PDPL') !== -1) badges.push('<span class="badge-pdpl">PDPL</span>');
+    if (frameworks.indexOf('UAE_AI_ETHICS') !== -1) badges.push('<span class="badge-ethics">AI Ethics</span>');
+    if (frameworks.indexOf('NESA') !== -1) badges.push('<span class="badge-nesa">NESA</span>');
     return '<div class="agent-card" style="cursor:pointer" onclick="showDeployModal(\'' + a.id + '\',\'' + safeName + '\')">' +
       '<div class="card-header"><h3>' + a.name + '</h3><span class="type-badge ' + typeClass + '">' + (a.type || 'custom') + '</span></div>' +
       '<div class="desc">' + (a.description || 'No description') + '</div>' +
+      '<div class="prompt-preview">' + promptPreview + '</div>' +
+      '<div class="agent-badges">' + badges.join('') + '</div>' +
       '<div class="meta">' +
         '<span><span class="status-dot ' + dotClass + '"></span> ' + (a.status || 'idle') + '</span>' +
         '<span>&#128202; ' + (a.decisions || 0) + ' runs</span>' +
@@ -757,6 +892,8 @@ document.getElementById('testInput').addEventListener('keydown', function(e) {
     sendDeployTest();
   }
 });
+var promptTA = document.getElementById('agentSystemPrompt');
+if (promptTA) promptTA.addEventListener('input', updateCharCount);
 </script>
 </body>
 </html>
