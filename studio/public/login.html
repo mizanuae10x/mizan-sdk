@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول — Mizan Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #060C18;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.05) 0%, transparent 60%),
+                      radial-gradient(ellipse at 80% 20%, rgba(11,31,58,0.8) 0%, transparent 50%);
+  }
+  .login-wrapper {
+    width: 100%;
+    max-width: 420px;
+    padding: 24px 16px;
+  }
+  .logo-area {
+    text-align: center;
+    margin-bottom: 36px;
+  }
+  .logo-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+  }
+  .logo-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #D4AF37;
+    letter-spacing: 0.5px;
+  }
+  .logo-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  .card {
+    background: #0B1F3A;
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 16px;
+    padding: 36px 32px;
+  }
+  .card-heading {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .form-group {
+    margin-bottom: 18px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 11px 14px;
+    background: #060C18;
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+    direction: ltr;
+  }
+  input:focus {
+    border-color: #D4AF37;
+    box-shadow: 0 0 0 3px rgba(212,175,55,0.1);
+  }
+  .btn-primary {
+    width: 100%;
+    padding: 13px;
+    background: #D4AF37;
+    color: #060C18;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    margin-top: 8px;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-primary:hover { background: #e5c453; }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error-banner {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    text-align: center;
+  }
+  .footer-text {
+    text-align: center;
+    color: #334155;
+    font-size: 12px;
+    margin-top: 28px;
+  }
+  .footer-text span { color: #D4AF37; }
+  .spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(6,12,24,0.3);
+    border-top-color: #060C18;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 480px) { .card { padding: 28px 20px; } }
+</style>
+</head>
+<body>
+<div class="login-wrapper">
+  <div class="logo-area">
+    <span class="logo-icon">⚖️</span>
+    <div class="logo-title">Mizan Studio</div>
+    <div class="logo-subtitle">AI Agent Platform</div>
+  </div>
+
+  <div class="card">
+    <div class="card-heading">تسجيل الدخول / Sign In</div>
+    <div class="error-banner" id="errorBanner"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">البريد الإلكتروني / Email</label>
+        <input type="email" id="email" placeholder="admin@example.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">كلمة المرور / Password</label>
+        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-primary" id="loginBtn">
+        <span id="btnText">تسجيل الدخول / Sign In</span>
+        <div class="spinner" id="spinner"></div>
+      </button>
+    </form>
+  </div>
+
+  <div class="footer-text">Powered by <span>⚖️ Mizan SDK</span></div>
+</div>
+
+<script>
+(function() {
+  // Check status on load
+  fetch('/api/auth/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.setup) { window.location.href = '/first-run.html'; return; }
+      if (d.authenticated) { window.location.href = '/index.html'; return; }
+    })
+    .catch(function() {});
+
+  // Check existing token
+  var existing = localStorage.getItem('mizanStudioToken');
+  if (existing) {
+    fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + existing } })
+      .then(function(r) { if (r.ok) window.location.href = '/index.html'; })
+      .catch(function() {});
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('loginBtn');
+    var spinner = document.getElementById('spinner');
+    var btnText = document.getElementById('btnText');
+    var errorBanner = document.getElementById('errorBanner');
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    spinner.style.display = 'block';
+    errorBanner.style.display = 'none';
+
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      btn.disabled = false;
+      btnText.style.display = 'block';
+      spinner.style.display = 'none';
+      if (res.ok && res.data.token) {
+        localStorage.setItem('mizanStudioToken', res.data.token);
+        window.location.href = '/index.html';
+      } else {
+        errorBanner.textContent = res.data.error || 'بيانات غير صحيحة / Invalid credentials';
+        errorBanner.style.display = 'block';
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btnText.style.display = 'block';
+      spinner.style.display = 'none';
+      errorBanner.textContent = 'خطأ في الاتصال / Connection error';
+      errorBanner.style.display = 'block';
+    });
+  });
+})();
+</script>
+</body>
+</html>

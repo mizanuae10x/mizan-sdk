@@ -84,6 +84,16 @@ textarea:focus,.input:focus,select:focus{outline:none;border-color:var(--gold)}
 </style>
 </head>
 <body>
+<script>
+(function(){
+  var t=localStorage.getItem("mizanStudioToken");
+  if(!t){window.location.href="/login.html";return;}
+  fetch("/api/auth/me",{headers:{"Authorization":"Bearer "+t}})
+    .then(function(r){if(r.status===401){localStorage.removeItem("mizanStudioToken");window.location.href="/login.html";}})
+    .catch(function(){});
+})();
+</script>
+
 <div class="hamburger" onclick="toggleSidebar()">☰</div>
 <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
 <div class="sidebar" id="sidebar">
@@ -100,7 +110,37 @@ textarea:focus,.input:focus,select:focus{outline:none;border-color:var(--gold)}
     <a href="webhooks.html"><span>🔗</span> Webhooks</a>
     <a href="orchestration.html"><span>🔀</span> Multi-Agent</a>
     <a href="setup.html">⚙️ Setup</a>
-  </nav>
+  <div style="position:absolute;bottom:20px;left:0;right:0;padding:0 12px;z-index:10;">
+  <div style="background:#060C18;border:1px solid rgba(212,175,55,0.12);border-radius:10px;padding:12px;font-size:13px;text-align:center;">
+    <div id="nav-user-name" style="color:#D4AF37;font-weight:600;margin-bottom:2px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">ميزان</div>
+    <div id="nav-user-email" style="font-size:11px;color:#475569;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+    <button id="nav-logout-btn" style="background:#D4AF37;color:#060C18;border:none;border-radius:6px;padding:5px 0;cursor:pointer;font-size:12px;font-weight:700;width:100%;font-family:inherit;">تسجيل الخروج</button>
+  </div>
+</div>
+<script>
+(function(){
+  var t=localStorage.getItem("mizanStudioToken");
+  if(!t)return;
+  fetch("/api/auth/me",{headers:{"Authorization":"Bearer "+t}})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.user){
+        var n=document.getElementById("nav-user-name");
+        var e=document.getElementById("nav-user-email");
+        if(n)n.textContent=d.user.name||"Admin";
+        if(e)e.textContent=d.user.email||"";
+      }
+    }).catch(function(){});
+  var btn=document.getElementById("nav-logout-btn");
+  if(btn)btn.onclick=function(){
+    var tok=localStorage.getItem("mizanStudioToken")||"";
+    localStorage.removeItem("mizanStudioToken");
+    fetch("/api/auth/logout",{method:"POST",headers:{"Authorization":"Bearer "+tok}});
+    window.location.href="/login.html";
+  };
+})();
+</script>
+</nav>
   <div class="version">📦 v1.1.0</div>
 </div>
 <div class="main">

@@ -202,6 +202,108 @@ async function runAgentChat(agentId, body = {}) {
   };
 }
 
+// ---- AUTH HELPERS ----
+const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
+const STUDIO_SESSIONS_FILE = path.join(DATA_DIR, 'studio-sessions.json');
+
+function readAuth() {
+  try { return JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8')); } catch(e) { return {}; }
+}
+function writeAuth(data) {
+  fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2));
+}
+function readStudioSessions() {
+  try { return JSON.parse(fs.readFileSync(STUDIO_SESSIONS_FILE, 'utf8')); } catch(e) { return { tokens: {} }; }
+}
+function writeStudioSessions(data) {
+  fs.writeFileSync(STUDIO_SESSIONS_FILE, JSON.stringify(data, null, 2));
+}
+function hashPassword(pw) {
+  return crypto.createHash('sha256').update(pw + 'mizan-salt-2026').digest('hex');
+}
+function genToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+function getTokenFromReq(req) {
+  const auth = req.headers['authorization'] || '';
+  return auth.replace('Bearer ', '').trim() || (req.headers['x-studio-token'] || '').trim();
+}
+function getSessionUser(token) {
+  if (!token) return null;
+  const sessions = readStudioSessions();
+  const session = sessions.tokens[token];
+  if (!session) return null;
+  if (new Date(session.expiresAt) < new Date()) return null;
+  return session;
+}
+function requireStudioAuth(req, res, next) {
+  const token = getTokenFromReq(req);
+  const user = getSessionUser(token);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  req.currentUser = user;
+  next();
+}
+
+// ---- AUTH ENDPOINTS ----
+app.get('/api/auth/status', (req, res) => {
+  const auth = readAuth();
+  if (!auth.admin) return res.json({ setup: false, authenticated: false });
+  const token = getTokenFromReq(req);
+  const user = getSessionUser(token);
+  if (user) return res.json({ setup: true, authenticated: true, user: { name: auth.admin.name, email: auth.admin.email, studioName: auth.admin.studioName, language: auth.admin.language } });
+  return res.json({ setup: true, authenticated: false });
+});
+
+app.post('/api/auth/setup', (req, res) => {
+  const auth = readAuth();
+  if (auth.admin) return res.status(409).json({ error: 'Admin already exists' });
+  const { name, email, password, studioName, language } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  auth.admin = { name, email, passwordHash: hashPassword(password), studioName: studioName || 'Mizan Studio', language: language || 'ar', createdAt: new Date().toISOString() };
+  writeAuth(auth);
+  const token = genToken();
+  const sessions = readStudioSessions();
+  const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+  sessions.tokens[token] = { name, email, createdAt: new Date().toISOString(), expiresAt: expires };
+  writeStudioSessions(sessions);
+  res.json({ success: true, token, user: { name, email, studioName: auth.admin.studioName, language: auth.admin.language } });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const auth = readAuth();
+  if (!auth.admin) return res.status(404).json({ error: 'Not set up' });
+  const { email, password } = req.body;
+  if (auth.admin.email !== email || auth.admin.passwordHash !== hashPassword(password)) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+  const token = genToken();
+  const sessions = readStudioSessions();
+  const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+  sessions.tokens[token] = { name: auth.admin.name, email, createdAt: new Date().toISOString(), expiresAt: expires };
+  writeStudioSessions(sessions);
+  res.json({ success: true, token, user: { name: auth.admin.name, email } });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = getTokenFromReq(req);
+  if (token) {
+    const sessions = readStudioSessions();
+    delete sessions.tokens[token];
+    writeStudioSessions(sessions);
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const token = getTokenFromReq(req);
+  const session = getSessionUser(token);
+  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+  const auth = readAuth();
+  const admin = auth.admin || {};
+  res.json({ user: { name: session.name, email: session.email, studioName: admin.studioName, language: admin.language } });
+});
+
 // ---- RULES CRUD ----
 app.get('/api/rules', (req, res) => res.json(readJSON(RULES_FILE)));
 

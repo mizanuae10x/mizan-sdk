@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الإعداد الأولي — Mizan Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #060C18;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background-image: radial-gradient(ellipse at 80% 30%, rgba(212,175,55,0.06) 0%, transparent 55%),
+                      radial-gradient(ellipse at 20% 70%, rgba(11,31,58,0.9) 0%, transparent 50%);
+  }
+  .setup-wrapper {
+    width: 100%;
+    max-width: 520px;
+  }
+  .logo-area {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-icon { font-size: 44px; display: block; margin-bottom: 10px; }
+  .logo-title { font-size: 22px; font-weight: 700; color: #D4AF37; }
+  .logo-subtitle { font-size: 13px; color: #64748b; margin-top: 3px; }
+  .card {
+    background: #0B1F3A;
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 16px;
+    padding: 36px 36px 32px;
+  }
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(212,175,55,0.1);
+    border: 1px solid rgba(212,175,55,0.2);
+    color: #D4AF37;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .card-heading {
+    font-size: 20px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 28px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #D4AF37;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 20px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(212,175,55,0.1);
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form-group { margin-bottom: 14px; }
+  label {
+    display: block;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  label .req { color: #ef4444; margin-right: 2px; }
+  input[type="text"], input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 10px 13px;
+    background: #060C18;
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+    direction: ltr;
+  }
+  input:focus {
+    border-color: #D4AF37;
+    box-shadow: 0 0 0 3px rgba(212,175,55,0.1);
+  }
+  input.error-field { border-color: #ef4444; }
+  .field-hint {
+    font-size: 11px;
+    color: #475569;
+    margin-top: 4px;
+  }
+  .field-hint.error { color: #fca5a5; }
+  .lang-group {
+    display: flex;
+    gap: 12px;
+  }
+  .lang-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #060C18;
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .lang-option:has(input:checked) {
+    border-color: #D4AF37;
+    background: rgba(212,175,55,0.05);
+  }
+  .lang-option input[type="radio"] { accent-color: #D4AF37; }
+  .lang-label { font-size: 13px; color: #e2e8f0; }
+  .error-banner {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    text-align: center;
+  }
+  .btn-primary {
+    width: 100%;
+    padding: 13px;
+    background: #D4AF37;
+    color: #060C18;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    margin-top: 20px;
+    transition: background 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-primary:hover { background: #e5c453; }
+  .btn-primary:active { transform: scale(0.99); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .spinner {
+    display: none;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(6,12,24,0.4);
+    border-top-color: #060C18;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .footer-text {
+    text-align: center;
+    color: #334155;
+    font-size: 12px;
+    margin-top: 24px;
+  }
+  .footer-text span { color: #D4AF37; }
+  @media (max-width: 520px) {
+    .card { padding: 28px 20px; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="setup-wrapper">
+  <div class="logo-area">
+    <span class="logo-icon">⚖️</span>
+    <div class="logo-title">Mizan Studio</div>
+    <div class="logo-subtitle">AI Agent Platform — First Time Setup</div>
+  </div>
+
+  <div class="card">
+    <div class="step-badge">⚙️ الإعداد الأولي / First Setup</div>
+    <div class="card-heading">إنشاء حساب المدير / Create Admin Account</div>
+    <div class="card-desc">هذا الإعداد يتم مرة واحدة فقط عند أول تشغيل للاستوديو<br>This runs only once when you first launch the studio.</div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <form id="setupForm">
+      <div class="section-label">معلومات الحساب / Account Info</div>
+
+      <div class="form-group">
+        <label for="name">الاسم الكامل / Full Name <span class="req">*</span></label>
+        <input type="text" id="name" placeholder="e.g. Abdullah Alkaabi" required autocomplete="name">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="email">البريد الإلكتروني / Email <span class="req">*</span></label>
+          <input type="email" id="email" placeholder="admin@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="studioName">اسم الاستوديو / Studio Name</label>
+          <input type="text" id="studioName" placeholder="Mizan Studio" value="Mizan Studio">
+        </div>
+      </div>
+
+      <div class="section-label">كلمة المرور / Password</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="password">كلمة المرور / Password <span class="req">*</span></label>
+          <input type="password" id="password" placeholder="8+ characters" required autocomplete="new-password">
+          <div class="field-hint" id="pwHint">8 أحرف على الأقل / Min 8 characters</div>
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">تأكيد كلمة المرور / Confirm <span class="req">*</span></label>
+          <input type="password" id="confirmPassword" placeholder="Repeat password" required autocomplete="new-password">
+          <div class="field-hint" id="confirmHint"></div>
+        </div>
+      </div>
+
+      <div class="section-label">التفضيلات / Preferences</div>
+
+      <div class="form-group">
+        <label>اللغة الافتراضية / Default Language</label>
+        <div class="lang-group">
+          <label class="lang-option">
+            <input type="radio" name="language" value="ar" checked>
+            <span class="lang-label">🇦🇪 العربية</span>
+          </label>
+          <label class="lang-option">
+            <input type="radio" name="language" value="en">
+            <span class="lang-label">🇬🇧 English</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="setupBtn">
+        <span id="btnText">إنشاء الحساب / Create Account</span>
+        <div class="spinner" id="spinner"></div>
+      </button>
+    </form>
+  </div>
+
+  <div class="footer-text">Powered by <span>⚖️ Mizan SDK</span></div>
+</div>
+
+<script>
+(function() {
+  // If already set up, redirect to login
+  fetch('/api/auth/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.setup) window.location.href = '/login.html';
+      if (d.authenticated) window.location.href = '/index.html';
+    })
+    .catch(function() {});
+
+  var pwInput = document.getElementById('password');
+  var confirmInput = document.getElementById('confirmPassword');
+  var pwHint = document.getElementById('pwHint');
+  var confirmHint = document.getElementById('confirmHint');
+
+  pwInput.addEventListener('input', function() {
+    if (pwInput.value.length > 0 && pwInput.value.length < 8) {
+      pwHint.textContent = 'كلمة المرور قصيرة / Too short';
+      pwHint.className = 'field-hint error';
+      pwInput.classList.add('error-field');
+    } else {
+      pwHint.textContent = '8 أحرف على الأقل / Min 8 characters';
+      pwHint.className = 'field-hint';
+      pwInput.classList.remove('error-field');
+    }
+    checkMatch();
+  });
+
+  confirmInput.addEventListener('input', checkMatch);
+
+  function checkMatch() {
+    if (confirmInput.value.length === 0) { confirmHint.textContent = ''; return; }
+    if (pwInput.value !== confirmInput.value) {
+      confirmHint.textContent = 'كلمات المرور غير متطابقة / Passwords do not match';
+      confirmHint.className = 'field-hint error';
+      confirmInput.classList.add('error-field');
+    } else {
+      confirmHint.textContent = '✓ متطابقة / Match';
+      confirmHint.className = 'field-hint';
+      confirmInput.classList.remove('error-field');
+    }
+  }
+
+  document.getElementById('setupForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var errorBanner = document.getElementById('errorBanner');
+    var btn = document.getElementById('setupBtn');
+    var spinner = document.getElementById('spinner');
+    var btnText = document.getElementById('btnText');
+
+    var name = document.getElementById('name').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var password = pwInput.value;
+    var confirm = confirmInput.value;
+    var studioName = document.getElementById('studioName').value.trim() || 'Mizan Studio';
+    var language = document.querySelector('input[name="language"]:checked').value;
+
+    errorBanner.style.display = 'none';
+
+    if (password.length < 8) {
+      errorBanner.textContent = 'كلمة المرور يجب أن تكون 8 أحرف على الأقل / Password must be at least 8 characters';
+      errorBanner.style.display = 'block'; return;
+    }
+    if (password !== confirm) {
+      errorBanner.textContent = 'كلمات المرور غير متطابقة / Passwords do not match';
+      errorBanner.style.display = 'block'; return;
+    }
+
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    spinner.style.display = 'block';
+
+    fetch('/api/auth/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, email: email, password: password, studioName: studioName, language: language })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      btn.disabled = false;
+      btnText.style.display = 'block';
+      spinner.style.display = 'none';
+      if (res.ok && res.data.token) {
+        localStorage.setItem('mizanStudioToken', res.data.token);
+        window.location.href = '/index.html';
+      } else {
+        errorBanner.textContent = res.data.error || 'خطأ في الإعداد / Setup error';
+        errorBanner.style.display = 'block';
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btnText.style.display = 'block';
+      spinner.style.display = 'none';
+      errorBanner.textContent = 'خطأ في الاتصال / Connection error';
+      errorBanner.style.display = 'block';
+    });
+  });
+})();
+</script>
+</body>
+</html>
