@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mizan Studio - Webhooks</title>
+<link rel="stylesheet" href="mobile.css" />
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0A1628 0%,#1B2B4B 100%);color:#fff;min-height:100vh}
+.sidebar{width:240px;background:#0B1F3A;padding:24px 0;display:flex;flex-direction:column;position:fixed;height:100vh;z-index:10}
+.sidebar .logo{padding:0 24px 24px;font-size:22px;font-weight:700;color:#D4AF37;border-bottom:1px solid rgba(212,175,55,.2)}
+.sidebar nav{flex:1;padding:16px 0;overflow:auto}
+.sidebar nav a{display:flex;align-items:center;gap:10px;padding:12px 24px;color:rgba(255,255,255,.7);text-decoration:none;font-size:14px;transition:all .2s}
+.sidebar nav a:hover,.sidebar nav a.active{color:#D4AF37;background:rgba(212,175,55,.08)}
+.sidebar nav a.active{border-right:3px solid #D4AF37}
+.sidebar .version{padding:16px 24px;font-size:12px;color:rgba(255,255,255,.3);border-top:1px solid rgba(212,175,55,.1)}
+.main{margin-left:240px;padding:24px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+h1{font-size:28px;color:#D4AF37}
+.card{background:rgba(255,255,255,.06);border:1px solid rgba(212,175,55,.25);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{font-size:18px;color:#D4AF37;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+input,select,textarea{width:100%;padding:10px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.2);color:#fff;border-radius:8px}
+input::placeholder,textarea::placeholder{color:rgba(255,255,255,.5)}
+textarea{min-height:100px;resize:vertical}
+button{background:#D4AF37;color:#0A1628;border:none;padding:10px 14px;border-radius:8px;font-weight:700;cursor:pointer}
+button.secondary{background:rgba(255,255,255,.14);color:#fff}
+button.danger{background:#ef4444;color:#fff}
+button.small{padding:6px 10px;font-size:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.1);font-size:13px;vertical-align:top}
+th{color:#D4AF37;text-align:left}
+code.url{display:inline-block;background:rgba(0,0,0,.25);padding:4px 6px;border-radius:6px;cursor:pointer;max-width:320px;overflow-wrap:anywhere}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.badge.active{background:rgba(34,197,94,.2);color:#4ade80}
+.badge.inactive{background:rgba(239,68,68,.2);color:#f87171}
+.examples pre{background:rgba(0,0,0,.28);padding:12px;border-radius:8px;white-space:pre-wrap;position:relative}
+.copy-btn{position:absolute;top:8px;right:8px}
+.msg{font-size:13px;opacity:.9;margin-top:8px}
+.mobile-menu-btn{display:none}
+.overlay{display:none}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+<div class="sidebar" id="sidebar">
+  <div class="logo">⚖️ Mizan Studio</div>
+  <nav>
+    <a href="index.html">🏠 Home</a>
+    <a href="rules.html">📋 Rule Editor</a>
+    <a href="decide.html">⚡ Decision Tester</a>
+    <a href="audit.html">📊 Audit Log</a>
+    <a href="agents.html">🤖 Agent Monitor</a>
+    <a href="compliance.html"><span>🇦🇪</span> UAE Compliance</a>
+    <a href="rag.html"><span>📚</span> Knowledge Base</a>
+    <a href="widget-demo.html"><span>🔌</span> Widget Demo</a>
+    <a href="webhooks.html" class="active"><span>🔗</span> Webhooks</a>
+    <a href="orchestration.html"><span>🔀</span> Multi-Agent</a>
+    <a href="setup.html">⚙️ Setup</a>
+  </nav>
+  <div class="version">v1.0.0</div>
+</div>
+
+<div class="main">
+  <div class="header"><h1>🔗 Webhook Triggers</h1></div>
+
+  <section class="card">
+    <h2>Create Webhook</h2>
+    <div class="grid">
+      <div><label>Webhook Name</label><input id="name" placeholder="e.g. Gmail Intake" /></div>
+      <div><label>Agent</label><select id="agentId"></select></div>
+      <div><label>Event Type</label><select id="event"><option>email.received</option><option>form.submitted</option><option>alert.triggered</option><option>schedule.fired</option><option>custom</option></select></div>
+      <div><label>Filter (optional)</label><input id="filter" placeholder="only trigger if payload contains this text" /></div>
+    </div>
+    <div style="margin-top:12px"><button onclick="createWebhook()">Create Webhook</button></div>
+    <div id="createMsg" class="msg"></div>
+  </section>
+
+  <section class="card">
+    <h2>Active Webhooks</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Agent</th><th>Event</th><th>Trigger URL</th><th>Last Triggered</th><th>Count</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="hooksBody"></tbody>
+    </table>
+  </section>
+
+  <section class="card examples">
+    <h2>Integration Examples</h2>
+    <pre id="ex1"># Gmail → n8n → Webhook → Agent
+POST /api/webhooks/trigger/{token}
+{ "event": "email.received", "from": "user@example.com", "message": "Hello" }<button class="copy-btn secondary small" onclick="copyBlock('ex1')">Copy</button></pre>
+    <pre id="ex2"># Microsoft Forms → Agent
+POST /api/webhooks/trigger/{token}
+{ "event": "form.submitted", "data": { "name": "Ahmed", "request": "..." } }<button class="copy-btn secondary small" onclick="copyBlock('ex2')">Copy</button></pre>
+    <pre id="ex3"># Uptime Kuma alert → Agent
+POST /api/webhooks/trigger/{token}
+{ "event": "alert.triggered", "monitor": "MOJ Website", "status": "DOWN" }<button class="copy-btn secondary small" onclick="copyBlock('ex3')">Copy</button></pre>
+  </section>
+</div>
+
+<script>
+let agents = [];
+
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('show')}
+function esc(s){return String(s||'').replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function fmt(t){return t ? new Date(t).toLocaleString() : '-'}
+
+async function loadAgents(){
+  agents = await (await fetch('/api/agents')).json();
+  const sel = document.getElementById('agentId');
+  sel.innerHTML = agents.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('') || '<option value="">No agents</option>';
+}
+
+async function loadHooks(){
+  const hooks = await (await fetch('/api/webhooks')).json();
+  const map = Object.fromEntries(agents.map(a => [a.id, a.name]));
+  const body = document.getElementById('hooksBody');
+  body.innerHTML = hooks.map(h => {
+    const fullUrl = location.origin + h.url;
+    return `<tr>
+      <td>${esc(h.name)}</td>
+      <td>${esc(map[h.agentId] || h.agentId)}</td>
+      <td>${esc(h.event)}</td>
+      <td><code class="url" onclick="copyText('${esc(fullUrl)}')">${esc(fullUrl)}</code></td>
+      <td>${fmt(h.lastTriggered)}</td>
+      <td>${h.triggerCount || 0}</td>
+      <td><span class="badge ${h.active ? 'active' : 'inactive'}">${h.active ? 'Active' : 'Inactive'}</span></td>
+      <td>
+        <button class="secondary small" onclick="toggleHook('${h.id}')">Toggle</button>
+        <button class="secondary small" onclick="testHook('${h.url}')">Test</button>
+        <button class="danger small" onclick="deleteHook('${h.id}')">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8">No webhooks created.</td></tr>';
+}
+
+async function createWebhook(){
+  const payload = {
+    name: document.getElementById('name').value.trim(),
+    agentId: document.getElementById('agentId').value,
+    event: document.getElementById('event').value,
+    filter: document.getElementById('filter').value.trim()
+  };
+  const res = await fetch('/api/webhooks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  const data = await res.json();
+  const msg = document.getElementById('createMsg');
+  msg.textContent = res.ok ? `Created: ${data.name}` : (data.error || 'Failed to create webhook');
+  if (res.ok) {
+    document.getElementById('name').value = '';
+    document.getElementById('filter').value = '';
+    loadHooks();
+  }
+}
+
+async function toggleHook(id){ await fetch('/api/webhooks/' + id + '/toggle', { method:'PATCH' }); loadHooks(); }
+async function deleteHook(id){ if (!confirm('Delete this webhook?')) return; await fetch('/api/webhooks/' + id, { method:'DELETE' }); loadHooks(); }
+async function testHook(url){
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ message:'Test payload from Mizan Studio', event:'manual.test' }) });
+  const d = await r.json();
+  alert(r.ok ? 'Triggered. Agent responded.' : ('Trigger failed: ' + (d.error || r.status)));
+  loadHooks();
+}
+
+async function copyText(text){ try { await navigator.clipboard.writeText(text); } catch {} }
+function copyBlock(id){ copyText(document.getElementById(id).innerText.replace('Copy','').trim()); }
+
+(async function init(){ await loadAgents(); await loadHooks(); })();
+</script>
+</body>
+</html>

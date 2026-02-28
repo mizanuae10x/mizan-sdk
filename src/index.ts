@@ -9,8 +9,10 @@ export { OpenAIAdapter, AnthropicAdapter, MockAdapter, autoDetectAdapter } from 
 export { webSearchTool, calculatorTool, dateTimeTool, httpTool, fileReaderTool } from './tools';
 export { UAEComplianceLayer, PDPLChecker, AIEthicsGuardrails, NESAControls } from './compliance';
 export { RAGEngine } from './RAGEngine';
+export { SessionMemory } from './SessionMemory';
 export type { Rule, Decision, AuditEntry, Conflict, AgentResponse, LLMAdapter } from './types';
 export type { Tool, ToolResult } from './ToolRegistry';
 export type { MemoryEntry } from './MemoryModule';
 export type { UAEComplianceConfig, UAEComplianceReport, ComplianceCheck, UAEFramework } from './compliance';
 export type { RagDocument, RagChunk, RagSearchResult, RagAnswer } from './RAGEngine';
+export type { Session, MemoryMessage } from './SessionMemory';

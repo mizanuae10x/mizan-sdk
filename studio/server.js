@@ -13,6 +13,7 @@ const DECISIONS_FILE = path.join(DATA_DIR, 'decisions.json');
 const DEMO_FILE = path.join(DATA_DIR, 'demo.json');
 const AGENTS_FILE = path.join(DATA_DIR, 'agents.json');
 const API_KEYS_FILE = path.join(DATA_DIR, 'api-keys.json');
+const WEBHOOKS_FILE = path.join(DATA_DIR, 'webhooks.json');
 
 let ragEngine = null;
 try {
@@ -20,6 +21,14 @@ try {
   ragEngine = new RAGEngine(path.join(DATA_DIR, 'rag-store.json'));
 } catch (e) {
   console.warn('RAG Engine not available (run npm run build first):', e.message);
+}
+
+let sessionMemory = null;
+try {
+  const { SessionMemory } = require('../dist/SessionMemory');
+  sessionMemory = new SessionMemory(path.join(DATA_DIR, 'sessions.json'));
+} catch (e) {
+  console.warn('SessionMemory not available:', e.message);
 }
 
 // Ensure data dir
@@ -46,6 +55,12 @@ function readKeys() {
 }
 function writeKeys(data) {
   fs.writeFileSync(API_KEYS_FILE, JSON.stringify(data, null, 2));
+}
+function readWebhooks() {
+  try { return JSON.parse(fs.readFileSync(WEBHOOKS_FILE, 'utf8')); } catch { return []; }
+}
+function writeWebhooks(data) {
+  fs.writeFileSync(WEBHOOKS_FILE, JSON.stringify(data, null, 2));
 }
 function normalizeAuthHeader(auth) {
   if (!auth) return '';
@@ -100,19 +115,22 @@ async function runAgentChat(agentId, body = {}) {
   }
 
   const systemPrompt = agent.systemPrompt || 'You are a helpful AI assistant.';
+  const history = sessionMemory ? sessionMemory.getHistory(session_id) : [];
 
   let answer = '';
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     const https = require('https');
+    const currentUserMessage = ragContext
+      ? `Context:\n${ragContext}\n\nQuestion: ${message}`
+      : message;
     answer = await new Promise((resolve, reject) => {
       const requestBody = JSON.stringify({
         model: agent.model || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...(ragContext
-            ? [{ role: 'user', content: `Context:\n${ragContext}\n\nQuestion: ${message}` }]
-            : [{ role: 'user', content: message }])
+          ...history.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          { role: 'user', content: currentUserMessage }
         ],
         max_tokens: 800
       });
@@ -147,6 +165,11 @@ async function runAgentChat(agentId, body = {}) {
       : `I am ${agent.name}. You asked: "${message}". (Connect an OpenAI API key for full responses.)`;
   }
 
+  if (sessionMemory) {
+    sessionMemory.addMessage(session_id, agentId, 'user', message);
+    sessionMemory.addMessage(session_id, agentId, 'assistant', answer);
+  }
+
   const auditEntry = {
     id: 'agt-' + Date.now().toString(36),
     timestamp: new Date().toISOString(),
@@ -166,6 +189,7 @@ async function runAgentChat(agentId, body = {}) {
       agentId,
       agentName: agent.name,
       sessionId: session_id,
+      sessionHistory: history.length,
       sources: ragSources,
       compliance: complianceReport ? {
         score: complianceReport.score,
@@ -536,6 +560,89 @@ app.delete('/api/rag/docs/:id', (req, res) => {
   res.json({ deleted: ok });
 });
 
+// ---- SESSION MEMORY ----
+app.get('/api/sessions', (req, res) => {
+  if (!sessionMemory) return res.json([]);
+  res.json(sessionMemory.listSessions(req.query.agentId));
+});
+
+app.get('/api/sessions/:id', (req, res) => {
+  if (!sessionMemory) return res.json({ messages: [] });
+  const history = sessionMemory.getHistory(req.params.id);
+  res.json({ sessionId: req.params.id, messages: history });
+});
+
+app.delete('/api/sessions/:id', (req, res) => {
+  if (sessionMemory) sessionMemory.clearSession(req.params.id);
+  res.json({ cleared: true });
+});
+
+// ---- WEBHOOKS ----
+app.get('/api/webhooks', (req, res) => res.json(readWebhooks()));
+
+app.post('/api/webhooks', (req, res) => {
+  const { name, agentId, event, filter } = req.body;
+  if (!name || !agentId || !event) return res.status(400).json({ error: 'name, agentId, event required' });
+
+  const webhook = {
+    id: 'wh-' + crypto.randomBytes(4).toString('hex'),
+    name,
+    agentId,
+    event,
+    filter: filter || '',
+    url: `/api/webhooks/trigger/${crypto.randomBytes(8).toString('hex')}`,
+    createdAt: new Date().toISOString(),
+    lastTriggered: null,
+    triggerCount: 0,
+    active: true
+  };
+
+  const hooks = readWebhooks();
+  hooks.push(webhook);
+  writeWebhooks(hooks);
+  res.json(webhook);
+});
+
+app.delete('/api/webhooks/:id', (req, res) => {
+  const hooks = readWebhooks().filter(w => w.id !== req.params.id);
+  writeWebhooks(hooks);
+  res.json({ deleted: true });
+});
+
+app.post('/api/webhooks/trigger/:token', async (req, res) => {
+  const hooks = readWebhooks();
+  const hook = hooks.find(w => w.url.endsWith(req.params.token) && w.active);
+  if (!hook) return res.status(404).json({ error: 'Webhook not found' });
+
+  hook.lastTriggered = new Date().toISOString();
+  hook.triggerCount = (hook.triggerCount || 0) + 1;
+  writeWebhooks(hooks);
+
+  const payload = req.body;
+  const payloadText = payload && typeof payload === 'object'
+    ? (payload.message || payload.text || payload.body || JSON.stringify(payload))
+    : String(payload || '');
+
+  try {
+    const result = await runAgentChat(hook.agentId, {
+      message: `[Webhook: ${hook.event}] ${payloadText}`,
+      session_id: `webhook-${hook.id}-${Date.now()}`
+    });
+    res.json({ triggered: true, hookId: hook.id, agentResponse: result.payload });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch('/api/webhooks/:id/toggle', (req, res) => {
+  const hooks = readWebhooks();
+  const hook = hooks.find(w => w.id === req.params.id);
+  if (!hook) return res.status(404).json({ error: 'Not found' });
+  hook.active = !hook.active;
+  writeWebhooks(hooks);
+  res.json({ active: hook.active });
+});
+
 // ---- AGENTS CRUD ----
 const PROJECT_DIR = path.resolve(__dirname, '..', '..', '..', '..');
 
@@ -718,6 +825,87 @@ app.get('/api/agents/:id/code', (req, res) => {
   } catch {
     res.status(404).json({ error: 'File not found' });
   }
+});
+
+// ---- ORCHESTRATION ----
+app.post('/api/orchestrate', async (req, res) => {
+  const { pipeline, input, sessionId = 'orch-' + Date.now().toString(36) } = req.body;
+  if (!pipeline || !Array.isArray(pipeline) || pipeline.length === 0) {
+    return res.status(400).json({ error: 'pipeline array required' });
+  }
+
+  const results = [];
+  let currentInput = (input && input.message) || input || '';
+
+  for (let i = 0; i < pipeline.length; i++) {
+    const step = pipeline[i];
+    try {
+      const result = await runAgentChat(step.agentId, {
+        message: step.passOutputAsInput !== false && i > 0
+          ? `Previous agent output:\n${results[i - 1]?.answer || ''}\n\nOriginal request: ${currentInput}`
+          : currentInput,
+        session_id: `${sessionId}-step${i}`
+      });
+
+      results.push({
+        step: i + 1,
+        agentId: step.agentId,
+        role: step.role || `Agent ${i + 1}`,
+        answer: result.payload?.answer || '',
+        compliance: result.payload?.compliance || null,
+        auditHash: result.payload?.auditHash || ''
+      });
+
+      if (step.passOutputAsInput !== false) {
+        currentInput = result.payload?.answer || currentInput;
+      }
+    } catch (e) {
+      results.push({ step: i + 1, agentId: step.agentId, role: step.role, error: e.message });
+    }
+  }
+
+  res.json({
+    pipelineId: 'pipe-' + Date.now().toString(36),
+    steps: pipeline.length,
+    results,
+    finalAnswer: results[results.length - 1]?.answer || '',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/orchestrate/templates', (req, res) => {
+  res.json([
+    {
+      id: 'policy-review',
+      name: '📜 Policy Review Pipeline',
+      description: 'Research → Compliance check → Arabic summary',
+      steps: [
+        { role: '🔍 Research Agent', note: 'Finds relevant policy information' },
+        { role: '🛡️ Compliance Agent', note: 'Checks UAE frameworks (PDPL, AI Ethics, NESA)' },
+        { role: '📝 Summary Agent', note: 'Generates executive Arabic summary' }
+      ]
+    },
+    {
+      id: 'document-analysis',
+      name: '📄 Document Analysis Pipeline',
+      description: 'Extract → Analyze → Report',
+      steps: [
+        { role: '📥 Extraction Agent', note: 'Extracts key information from document' },
+        { role: '⚖️ Legal Analysis Agent', note: 'Legal implications and risks' },
+        { role: '📊 Report Agent', note: 'Structured executive report' }
+      ]
+    },
+    {
+      id: 'citizen-request',
+      name: '🏛️ Citizen Request Pipeline',
+      description: 'Classify → Route → Respond',
+      steps: [
+        { role: '🏷️ Classification Agent', note: 'Classifies request type and urgency' },
+        { role: '🔍 Research Agent', note: 'Finds relevant regulations and procedures' },
+        { role: '✉️ Response Agent', note: 'Drafts formal government response' }
+      ]
+    }
+  ]);
 });
 
 function toPascalCase(str) {
