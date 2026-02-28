@@ -1,4 +1,5 @@
 export { RuleEngine } from './RuleEngine';
+export { ExpressionEvaluator, evaluateExpression } from './ExpressionEvaluator';
 export { AuditLogger } from './AuditLogger';
 export { PolicyParser } from './PolicyParser';
 export { MizanAgent } from './MizanAgent';

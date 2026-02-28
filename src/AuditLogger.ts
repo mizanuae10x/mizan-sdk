@@ -8,9 +8,18 @@ export class AuditLogger {
   private previousHash: string = '0'.repeat(64);
   private filePath: string;
 
-  constructor(filePath?: string) {
+  /**
+   * @param filePath - Path to the audit JSONL file. Defaults to `data/audit.jsonl`.
+   * @param preload  - If true, loads all existing entries from disk into memory on startup.
+   *                   Enables in-memory query after restart. Default: false (chain-only restore).
+   */
+  constructor(filePath?: string, preload = false) {
     this.filePath = filePath || path.join(process.cwd(), 'data', 'audit.jsonl');
-    this.restoreChainFromDisk();
+    if (preload) {
+      this.loadFromDisk();
+    } else {
+      this.restoreChainFromDisk();
+    }
   }
 
   // Restore previousHash from the last line of the audit file on startup
@@ -127,5 +136,62 @@ export class AuditLogger {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Load all entries from disk into this.entries.
+   * Useful after a restart to make `query()` return the full history.
+   * Also restores the hash chain pointer from the last entry.
+   */
+  loadFromDisk(): void {
+    try {
+      if (!fs.existsSync(this.filePath)) return;
+      const content = fs.readFileSync(this.filePath, 'utf8').trim();
+      if (!content) return;
+      const lines = content.split('\n').filter(l => l.trim());
+      this.entries = lines.map(l => JSON.parse(l) as AuditEntry);
+      if (this.entries.length > 0) {
+        this.previousHash = this.entries[this.entries.length - 1].hash;
+      }
+    } catch {
+      // Corrupt file — reset to empty, chain starts fresh
+      this.entries = [];
+    }
+  }
+
+  /**
+   * Query entries from disk directly (bypasses in-memory state).
+   * Safe to call after a restart even if `loadFromDisk()` was not used.
+   * Returns all entries from the JSONL file matching the optional filter.
+   */
+  queryFromDisk(filter?: { startDate?: string; endDate?: string; result?: string }): AuditEntry[] {
+    try {
+      if (!fs.existsSync(this.filePath)) return [];
+      const content = fs.readFileSync(this.filePath, 'utf8').trim();
+      if (!content) return [];
+      const entries: AuditEntry[] = content
+        .split('\n')
+        .filter(l => l.trim())
+        .map(l => JSON.parse(l) as AuditEntry);
+
+      if (!filter) return entries;
+      return entries.filter(e => {
+        if (filter.startDate && e.timestamp < filter.startDate) return false;
+        if (filter.endDate   && e.timestamp > filter.endDate)   return false;
+        if (filter.result    && e.output.result !== filter.result) return false;
+        return true;
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Number of entries currently in memory.
+   * After a restart (without preload), this is the count since the process started.
+   * Use `queryFromDisk().length` for total historical count.
+   */
+  size(): number {
+    return this.entries.length;
   }
 }

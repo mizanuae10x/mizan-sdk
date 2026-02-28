@@ -16,14 +16,90 @@ export const webSearchTool: Tool = {
   },
 };
 
+// ── Safe Math Evaluator ────────────────────────────────────────────────────────
+// Recursive-descent parser for arithmetic expressions.
+// Supports: +, -, *, /, ^(power), unary minus/plus, parentheses, decimals.
+// No eval(), no Function() — pure string parsing.
+
+function safeMath(expr: string): number {
+  let pos = 0;
+  const s = expr.replace(/\s+/g, '');
+
+  function parseExpr(): number { return parseAddSub(); }
+
+  function parseAddSub(): number {
+    let v = parseMulDiv();
+    while (pos < s.length && (s[pos] === '+' || s[pos] === '-')) {
+      const op = s[pos++];
+      const r = parseMulDiv();
+      v = op === '+' ? v + r : v - r;
+    }
+    return v;
+  }
+
+  function parseMulDiv(): number {
+    let v = parsePow();
+    while (pos < s.length && (s[pos] === '*' || s[pos] === '/')) {
+      const op = s[pos++];
+      const r = parsePow();
+      if (op === '/' && r === 0) throw new Error('Division by zero');
+      v = op === '*' ? v * r : v / r;
+    }
+    return v;
+  }
+
+  function parsePow(): number {
+    let base = parseUnary();
+    if (pos < s.length && s[pos] === '^') {
+      pos++;
+      const exp = parseUnary(); // right-associative
+      base = Math.pow(base, exp);
+    }
+    return base;
+  }
+
+  function parseUnary(): number {
+    if (s[pos] === '-') { pos++; return -parsePrimary(); }
+    if (s[pos] === '+') { pos++; return parsePrimary(); }
+    return parsePrimary();
+  }
+
+  function parsePrimary(): number {
+    if (s[pos] === '(') {
+      pos++; // consume '('
+      const v = parseExpr();
+      if (s[pos] !== ')') throw new Error(`Missing closing parenthesis at position ${pos}`);
+      pos++; // consume ')'
+      return v;
+    }
+    const m = s.slice(pos).match(/^[0-9]+(\.[0-9]+)?/);
+    if (!m) throw new Error(`Unexpected character '${s[pos]}' at position ${pos} in: "${expr}"`);
+    pos += m[0].length;
+    return parseFloat(m[0]);
+  }
+
+  const result = parseExpr();
+  if (pos !== s.length) {
+    throw new Error(`Unexpected character '${s[pos]}' at position ${pos} in: "${expr}"`);
+  }
+  return result;
+}
+
 export const calculatorTool: Tool = {
   name: 'calculate',
-  description: 'Evaluate mathematical expressions safely',
-  input: { expression: 'Math expression to evaluate' },
+  description: 'Evaluate mathematical expressions safely (no eval/Function used)',
+  input: { expression: 'Math expression — supports +, -, *, /, ^, parentheses, decimals' },
   handler: async ({ expression }) => {
-    const sanitized = String(expression).replace(/[^0-9+\-*/()., ]/g, '');
-    const result = new Function('return (' + sanitized + ')')();
-    return { result, expression: sanitized };
+    const sanitized = String(expression)
+      .replace(/[^0-9+\-*/().^ ]/g, '') // strip anything not math
+      .trim();
+    if (!sanitized) return { result: null, error: 'Empty expression' };
+    try {
+      const result = safeMath(sanitized);
+      return { result, expression: sanitized };
+    } catch (err) {
+      return { result: null, error: (err as Error).message, expression: sanitized };
+    }
   },
 };
 

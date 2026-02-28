@@ -18,22 +18,56 @@ app.use(cors({
   credentials: true
 }));
 
-// ---- SECURITY: Simple in-process rate limiter for auth endpoints ----
-const _rateLimitMap = new Map(); // ip -> { count, resetAt }
-function authRateLimit(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+// ---- SECURITY: In-process rate limiter (auth + general API) ----
+const _rateLimitMap = new Map(); // ip:bucket -> { count, resetAt }
+
+function _checkLimit(ip, bucket, maxRequests, windowMs, res) {
+  const key = `${ip}:${bucket}`;
   const now = Date.now();
-  const entry = _rateLimitMap.get(ip);
+  const entry = _rateLimitMap.get(key);
   if (entry && now < entry.resetAt) {
-    if (entry.count >= 10) {
-      return res.status(429).json({ error: 'Too many attempts. Try again in 1 minute.' });
+    if (entry.count >= maxRequests) {
+      res.set('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+      res.status(429).json({ error: `Rate limit exceeded. Max ${maxRequests} requests per ${windowMs / 1000}s.` });
+      return false;
     }
     entry.count++;
   } else {
-    _rateLimitMap.set(ip, { count: 1, resetAt: now + 60000 });
+    _rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
   }
+  return true;
+}
+
+/** Strict: 10 attempts per 15 min (auth endpoints) */
+function authRateLimit(req, res, next) {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (!_checkLimit(ip, 'auth', 10, 15 * 60 * 1000, res)) return;
   next();
 }
+
+/** General: 120 requests per minute (all API routes) */
+function apiRateLimit(req, res, next) {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  if (!_checkLimit(ip, 'api', 120, 60 * 1000, res)) return;
+  next();
+}
+
+// ---- PERFORMANCE: Session cache (avoids disk read on every request) ----
+let _sessionsCache = null;
+let _sessionsCacheAt = 0;
+const SESSION_CACHE_TTL = 5000; // 5 seconds
+
+function readStudioSessionsCached() {
+  const now = Date.now();
+  if (_sessionsCache && now - _sessionsCacheAt < SESSION_CACHE_TTL) return _sessionsCache;
+  try {
+    _sessionsCache = JSON.parse(fs.readFileSync(STUDIO_SESSIONS_FILE, 'utf8'));
+  } catch { _sessionsCache = { tokens: {} }; }
+  _sessionsCacheAt = now;
+  return _sessionsCache;
+}
+
+function invalidateSessionCache() { _sessionsCache = null; }
 
 const DATA_DIR = path.join(__dirname, 'data');
 const RULES_FILE = path.join(DATA_DIR, 'rules.json');
@@ -63,7 +97,18 @@ try {
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.set('Cache-Control', 'no-store'); // HTML: never cache (auth guard in every page)
+    } else if (filePath.match(/\.(js|css)$/)) {
+      res.set('Cache-Control', 'public, max-age=3600'); // JS/CSS: 1h cache
+    }
+  }
+}));
+
+// Apply general rate limit to all /api/* routes
+app.use('/api', apiRateLimit);
 
 function readJSON(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return []; }
@@ -240,10 +285,11 @@ function writeAuth(data) {
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2));
 }
 function readStudioSessions() {
-  try { return JSON.parse(fs.readFileSync(STUDIO_SESSIONS_FILE, 'utf8')); } catch(e) { return { tokens: {} }; }
+  return readStudioSessionsCached();
 }
 function writeStudioSessions(data) {
   fs.writeFileSync(STUDIO_SESSIONS_FILE, JSON.stringify(data, null, 2));
+  invalidateSessionCache();
 }
 function hashPassword(pw) {
   return crypto.createHash('sha256').update(pw + 'mizan-salt-2026').digest('hex');
