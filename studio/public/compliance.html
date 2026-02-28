@@ -149,7 +149,7 @@ textarea:focus{outline:none;border-color:#D4AF37}
 </div>
 <div class="main">
   <h1>🇦🇪 UAE Compliance</h1>
-  <p class="subtitle">PDPL, AI Ethics, and NESA compliance scanning with bilingual reporting</p>
+  <p class="subtitle">PDPL, AI Ethics, NESA, and Dubai AI Law (Law 9/2023) compliance scanning with bilingual reporting</p>
 
   <section class="stats-grid">
     <article class="stat-card">
@@ -173,6 +173,13 @@ textarea:focus{outline:none;border-color:#D4AF37}
       <div class="stat-meta">4 Controls</div>
       <a href="https://u.ae/en/about-the-uae/digital-uae/cyber-safety-and-digital-security" target="_blank" rel="noopener">Learn More ↗</a>
     </article>
+    <article class="stat-card" style="border-color:rgba(139,92,246,0.25);">
+      <h3>🏙️ Dubai AI Law</h3>
+      <p>Dubai Law No. 9 of 2023 — Regulating AI in Dubai</p>
+      <div class="badge-active" style="background:rgba(139,92,246,0.12);border-color:rgba(139,92,246,0.3);color:#a78bfa;"><span class="dot" style="background:#a78bfa;"></span> ACTIVE</div>
+      <div class="stat-meta">5 Articles (3, 5, 8, 10, 12)</div>
+      <a href="https://dlp.dubai.gov.ae/" target="_blank" rel="noopener">Learn More ↗</a>
+    </article>
   </section>
 
   <section class="panel">
@@ -189,6 +196,7 @@ textarea:focus{outline:none;border-color:#D4AF37}
           <label><input type="checkbox" value="PDPL" checked> PDPL</label>
           <label><input type="checkbox" value="UAE_AI_ETHICS" checked> UAE AI Ethics</label>
           <label><input type="checkbox" value="NESA" checked> NESA</label>
+          <label><input type="checkbox" value="DUBAI_AI_LAW"> 🏙️ Dubai AI Law</label>
         </div>
       </div>
       <div class="option-group">
@@ -251,11 +259,13 @@ document.querySelectorAll('.toggle button').forEach(btn=>{
 function frameworkClass(framework){
   if(framework==='PDPL') return 'pdpl';
   if(framework==='UAE_AI_ETHICS') return 'uae_ai_ethics';
+  if(framework==='DUBAI_AI_LAW') return 'dubai_ai';
   return 'nesa';
 }
 
 function frameworkPill(framework){
   if(framework==='PDPL') return '<span class="fw-pill fw-pdpl">PDPL</span>';
+  if(framework==='DUBAI_AI_LAW') return '<span class="fw-pill" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);">🏙️ Dubai AI Law</span>';
   if(framework==='UAE_AI_ETHICS') return '<span class="fw-pill fw-ethics">UAE_AI_ETHICS</span>';
   return '<span class="fw-pill fw-nesa">NESA</span>';
 }

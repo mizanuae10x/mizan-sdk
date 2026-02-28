@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import { AuditEntry, Decision } from '../../types';
 import { AIEthicsGuardrails } from './AIEthicsGuardrails';
+import { DubaiAILawChecker } from './DubaiAILawChecker';
 import { NESAControls } from './NESAControls';
 import { PDPLChecker } from './PDPLChecker';
 import {
@@ -17,6 +18,7 @@ export class UAEComplianceLayer {
   private pdplChecker: PDPLChecker;
   private aiEthics: AIEthicsGuardrails;
   private nesa: NESAControls;
+  private dubaiAILaw: DubaiAILawChecker;
   private activeFrameworks: UAEFramework[] = [];
 
   constructor(config: UAEComplianceConfig) {
@@ -29,6 +31,7 @@ export class UAEComplianceLayer {
     this.pdplChecker = new PDPLChecker();
     this.aiEthics = new AIEthicsGuardrails();
     this.nesa = new NESAControls();
+    this.dubaiAILaw = new DubaiAILawChecker();
   }
 
   evaluate(
@@ -42,6 +45,8 @@ export class UAEComplianceLayer {
 
     if (frameworkSet.has('PDPL')) {
       checks.push(...this.pdplChecker.check(input, this.config));
+      // Extended PDPL checks: Art.3 (rights), Art.16 (sensitive data), Art.18 (breach notification)
+      checks.push(...this.pdplChecker.checkExtended(input, this.config));
     }
     if (frameworkSet.has('UAE_AI_ETHICS')) {
       checks.push(...this.aiEthics.evaluate(decision, input, this.config));
@@ -50,17 +55,7 @@ export class UAEComplianceLayer {
       checks.push(...this.nesa.assess(auditEntry, this.config));
     }
     if (frameworkSet.has('DUBAI_AI_LAW')) {
-      checks.push({
-        framework: 'DUBAI_AI_LAW',
-        article: 'Art. 8',
-        status: 'REVIEW_REQUIRED',
-        requirement: 'AI system deployment should align with Dubai AI governance obligations.',
-        requirementAr: 'يجب أن يتوافق نشر نظام الذكاء الاصطناعي مع التزامات حوكمة الذكاء الاصطناعي في دبي.',
-        passed: false,
-        details: 'Dubai-specific legal controls are enabled but require contextual legal mapping.',
-        remediation: 'Map business use case to Dubai AI Law obligations and sector guidance.',
-        remediationAr: 'قم بمواءمة حالة الاستخدام مع متطلبات قانون الذكاء الاصطناعي في دبي.',
-      });
+      checks.push(...this.dubaiAILaw.check(input, this.config));
     }
     if (frameworkSet.has('ADGM')) {
       checks.push({

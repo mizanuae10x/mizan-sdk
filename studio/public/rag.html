@@ -161,10 +161,29 @@ textarea:focus,.input:focus,select:focus{outline:none;border-color:var(--gold)}
       <div class="upload">
         <label for="docName">Document Name</label>
         <input id="docName" class="input" placeholder="e.g., UAE Policy Handbook">
-        <label for="docContent">Paste Document Content</label>
-        <textarea id="docContent" placeholder="Paste text here to ingest into your knowledge base..."></textarea>
+
+        <!-- File Drop Zone -->
+        <div id="dropZone" style="border:2px dashed rgba(212,175,55,0.3);border-radius:10px;padding:18px;text-align:center;cursor:pointer;margin:10px 0;transition:border-color 0.2s,background 0.2s;" ondragover="event.preventDefault();this.style.borderColor='#D4AF37';this.style.background='rgba(212,175,55,0.06)';" ondragleave="this.style.borderColor='rgba(212,175,55,0.3)';this.style.background='transparent';" ondrop="handleFileDrop(event);" onclick="document.getElementById('fileInput').click()">
+          <input type="file" id="fileInput" style="display:none" accept=".txt,.md,.pdf,.docx,.csv,.json,.html" onchange="handleFileSelect(this)">
+          <div style="font-size:22px;margin-bottom:6px">📎</div>
+          <div style="font-size:13px;color:#D4AF37;font-weight:600;">رفع ملف / Drop File or Click</div>
+          <div style="font-size:11px;color:#64748b;margin-top:3px;">TXT · MD · PDF · DOCX · CSV · JSON</div>
+          <div id="fileSelectedName" style="font-size:12px;color:#D4AF37;margin-top:6px;display:none;"></div>
+        </div>
+
+        <label for="docContent" style="margin-top:4px;display:block;">أو الصق النص / Or Paste Content</label>
+        <textarea id="docContent" placeholder="Paste text content here..."></textarea>
+
+        <!-- Duplicate warning -->
+        <div id="dupWarning" style="display:none;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;">
+          <div style="color:#fbbf24;font-weight:600;margin-bottom:4px;">⚠️ مستند مكرر / Duplicate Document Detected</div>
+          <div id="dupMessage" style="color:#94a3b8;margin-bottom:8px;"></div>
+          <button class="btn" onclick="forceIngest()" style="background:#D4AF37;color:#060C18;font-size:12px;padding:5px 14px;font-weight:700;">استبدال / Replace Anyway</button>
+          <button class="btn" onclick="document.getElementById('dupWarning').style.display='none'" style="background:transparent;border:1px solid rgba(212,175,55,0.3);color:#D4AF37;font-size:12px;padding:5px 14px;margin-right:6px;">إلغاء / Cancel</button>
+        </div>
+
         <div class="row" style="margin-top:8px;justify-content:space-between">
-          <button class="btn btn-gold" id="ingestBtn">Ingest Document</button>
+          <button class="btn btn-gold" id="ingestBtn">⬆️ Ingest Document</button>
           <span id="ingestStatus" style="font-size:12px;color:var(--muted)"></span>
         </div>
       </div>
@@ -294,21 +313,112 @@ async function refreshKB(){
   }
 }
 
-document.getElementById('ingestBtn').addEventListener('click',async()=>{
-  const name=document.getElementById('docName').value.trim();
-  const content=document.getElementById('docContent').value.trim();
-  if(!name||!content){alert('Document name and content are required.');return;}
-  try{
-    setIngestStatus('Ingesting...',true);
-    await api('/api/rag/ingest',{method:'POST',body:JSON.stringify({name,content})});
-    document.getElementById('docContent').value='';
-    setIngestStatus('Ingested successfully.');
+// File upload state
+let _pendingFileBase64 = null;
+let _pendingFileMime = null;
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  readFileForIngest(file);
+}
+
+function handleFileDrop(event) {
+  event.preventDefault();
+  document.getElementById('dropZone').style.borderColor = 'rgba(212,175,55,0.3)';
+  document.getElementById('dropZone').style.background = 'transparent';
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  readFileForIngest(file);
+}
+
+function readFileForIngest(file) {
+  _pendingFileBase64 = null;
+  _pendingFileMime = null;
+  const nameInput = document.getElementById('docName');
+  if (!nameInput.value.trim()) nameInput.value = file.name;
+  const nameEl = document.getElementById('fileSelectedName');
+  nameEl.textContent = '✅ ' + file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+  nameEl.style.display = 'block';
+
+  // For text files, read as text directly
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (['txt','md','csv','json','html','xml','rst'].includes(ext)) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('docContent').value = e.target.result;
+      _pendingFileBase64 = null;
+    };
+    reader.readAsText(file);
+  } else {
+    // Binary files: read as base64
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      _pendingFileBase64 = dataUrl.split(',')[1];
+      _pendingFileMime = file.type;
+      document.getElementById('docContent').value = '';
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+async function doIngest(force = false) {
+  const name = document.getElementById('docName').value.trim();
+  const content = document.getElementById('docContent').value.trim();
+  const base64Content = _pendingFileBase64;
+  const mimeType = _pendingFileMime;
+
+  if (!name) { alert('Document name is required.'); return; }
+  if (!content && !base64Content) { alert('Please paste content or upload a file.'); return; }
+
+  document.getElementById('dupWarning').style.display = 'none';
+  setIngestStatus('Ingesting...', true);
+
+  try {
+    const body = { name, force };
+    if (content) body.content = content;
+    if (base64Content) { body.base64Content = base64Content; body.mimeType = mimeType; }
+
+    const res = await fetch('/api/rag/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('mizanStudioToken') || '') },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (res.status === 409 && data.duplicate) {
+      // Show duplicate warning
+      setIngestStatus('');
+      document.getElementById('dupMessage').textContent =
+        (data.duplicateType === 'hash' ? '📋 Same content already exists as: ' : '📁 Same name already exists: ') +
+        data.doc.name + ' (created ' + new Date(data.doc.createdAt).toLocaleDateString('ar-AE') + ')';
+      document.getElementById('dupWarning').style.display = 'block';
+      return;
+    }
+
+    if (!res.ok) throw new Error(data.error || 'Ingest failed');
+
+    document.getElementById('docContent').value = '';
+    document.getElementById('docName').value = '';
+    document.getElementById('fileSelectedName').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+    _pendingFileBase64 = null;
+    _pendingFileMime = null;
+    setIngestStatus('✅ Ingested — ' + data.chunkCount + ' chunks');
     await refreshKB();
-  }catch(e){
+  } catch(e) {
     setIngestStatus('');
     alert(e.message);
   }
-});
+}
+
+function forceIngest() {
+  document.getElementById('dupWarning').style.display = 'none';
+  doIngest(true);
+}
+
+document.getElementById('ingestBtn').addEventListener('click', () => doIngest(false));
 
 document.getElementById('sendBtn').addEventListener('click',sendQuery);
 document.getElementById('queryInput').addEventListener('keydown',e=>{

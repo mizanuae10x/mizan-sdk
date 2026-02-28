@@ -551,6 +551,42 @@ function runComplianceCheck(input, frameworks, language) {
     });
   }
 
+  if (frameworks.includes('PDPL')) {
+    // Extended PDPL — Art. 3, 16, 18
+    const hasSensitive = /health|medical|biometric|genetic|ethnic|religion|political_opinion|criminal|child|minor/.test(inputStr);
+    const hasSensitiveConsent = /sensitiveDataConsent|explicit_consent|health_consent|biometric_consent/.test(inputStr);
+    checks.push({
+      framework: 'PDPL', article: 'Art. 3 — Data Subject Rights',
+      status: /allowAccess|allowDeletion|allowCorrection|dataSubjectRights|dsr_enabled|subject_rights/.test(inputStr) ? 'COMPLIANT' : 'REVIEW_REQUIRED',
+      requirement: 'Individuals have the right to access, correct, and delete their personal data.',
+      requirementAr: 'للأفراد الحق في الوصول إلى بياناتهم الشخصية وتصحيحها وحذفها.',
+      passed: /allowAccess|allowDeletion|allowCorrection|dsr_enabled/.test(inputStr),
+      details: /dsr_enabled/.test(inputStr) ? 'Data subject rights configured.' : 'No data subject rights markers — required for personal data systems.',
+      remediation: 'Add dsr_enabled=true and implement access/correction/deletion flows.',
+      remediationAr: 'أضف dsr_enabled=true ونفّذ مسارات الوصول والتصحيح والحذف.'
+    });
+    checks.push({
+      framework: 'PDPL', article: 'Art. 16 — Sensitive Personal Data',
+      status: (!hasSensitive || hasSensitiveConsent) ? 'COMPLIANT' : 'NON_COMPLIANT',
+      requirement: 'Sensitive data (health, biometric, genetic, religious, criminal) requires explicit separate consent.',
+      requirementAr: 'تتطلب البيانات الحساسة موافقة صريحة منفصلة وحماية معززة.',
+      passed: !hasSensitive || hasSensitiveConsent,
+      details: hasSensitive ? (hasSensitiveConsent ? 'Sensitive data with explicit consent detected.' : 'Sensitive data without explicit consent.') : 'No sensitive categories detected.',
+      remediation: 'Add sensitiveDataConsent=true for health/biometric/genetic data processing.',
+      remediationAr: 'أضف sensitiveDataConsent=true لمعالجة البيانات الصحية والبيومترية والجينية.'
+    });
+    checks.push({
+      framework: 'PDPL', article: 'Art. 18 — Breach Notification (72h)',
+      status: /breachNotification|incident_response|breach_plan|dpo_contact/.test(inputStr) ? 'COMPLIANT' : 'REVIEW_REQUIRED',
+      requirement: 'Data breaches must be reported to UAE Data Office within 72 hours.',
+      requirementAr: 'يجب الإبلاغ عن اختراقات البيانات لمكتب بيانات الإمارات خلال 72 ساعة.',
+      passed: /breachNotification|incident_response|dpo_contact/.test(inputStr),
+      details: /dpo_contact/.test(inputStr) ? 'Breach notification plan present.' : 'No breach notification plan or DPO contact specified.',
+      remediation: 'Add breachNotificationEnabled=true and specify dpo_contact.',
+      remediationAr: 'أضف breachNotificationEnabled=true وحدد جهة اتصال مسؤول حماية البيانات.'
+    });
+  }
+
   if (frameworks.includes('NESA')) {
     const hasSecret = /password|secret|token|api_key|private_key/.test(inputStr);
     checks.push({
@@ -572,6 +608,54 @@ function runComplianceCheck(input, frameworks, language) {
       requirementAr: 'يجب تسجيل جميع قرارات الذكاء الاصطناعي مع مسار تدقيق مقاوم للتلاعب',
       passed: true,
       details: 'SHA-256 hash chain audit logging is active'
+    });
+  }
+
+  if (frameworks.includes('DUBAI_AI_LAW')) {
+    const prohibited = /deepfake|deep_fake|voice_clone|face_swap|social_scoring|mass_surveillance|subliminal|emotional_manipulation/.test(inputStr);
+    const highRisk = /critical_infrastructure|law_enforcement|judiciary|healthcare_decision|employment_screening|credit_scoring|biometric_identification/.test(inputStr);
+    const hasRegistration = /aiRegistrationId|conformityId|dga_registration|registration_number/.test(inputStr);
+    const hasDisclosure = /aiDisclosure|isAI|ai_generated|disclosedAsAI/.test(inputStr);
+    const hasHumanOversight = /humanReview|humanInLoop|human_oversight|requires_approval|hitl/.test(inputStr);
+    checks.push({
+      framework: 'DUBAI_AI_LAW', article: 'Art. 3 — Prohibited Uses',
+      status: prohibited ? 'NON_COMPLIANT' : 'COMPLIANT',
+      requirement: 'AI systems must not engage in deepfakes, social scoring, subliminal manipulation, or mass surveillance.',
+      requirementAr: 'يُحظر استخدام الذكاء الاصطناعي في التزوير العميق والتسجيل الاجتماعي والمراقبة الجماعية.',
+      passed: !prohibited,
+      details: prohibited ? 'Prohibited AI use markers detected.' : 'No prohibited use markers found.',
+      remediation: 'Remove functionality related to prohibited AI uses in Art. 3 of Dubai AI Law.',
+      remediationAr: 'أزل الوظائف المتعلقة بالاستخدامات المحظورة في المادة 3 من قانون الذكاء الاصطناعي لدبي.'
+    });
+    checks.push({
+      framework: 'DUBAI_AI_LAW', article: 'Art. 5 — AI Registration',
+      status: (highRisk && !hasRegistration) ? 'REVIEW_REQUIRED' : 'COMPLIANT',
+      requirement: 'High-risk AI products must be registered with Dubai Digital Authority.',
+      requirementAr: 'يجب تسجيل منتجات الذكاء الاصطناعي عالية المخاطر لدى هيئة دبي الرقمية.',
+      passed: !highRisk || hasRegistration,
+      details: highRisk ? (hasRegistration ? 'High-risk AI with registration ID present.' : 'High-risk AI category detected — no registration ID.') : 'Not classified as high-risk AI.',
+      remediation: 'Register with Dubai Digital Authority and include aiRegistrationId.',
+      remediationAr: 'سجّل لدى هيئة دبي الرقمية وأضف معرّف التسجيل.'
+    });
+    checks.push({
+      framework: 'DUBAI_AI_LAW', article: 'Art. 8 — Transparency Disclosure',
+      status: hasDisclosure ? 'COMPLIANT' : 'REVIEW_REQUIRED',
+      requirement: 'AI systems interacting with individuals must disclose their AI nature.',
+      requirementAr: 'يجب على أنظمة الذكاء الاصطناعي الإفصاح عن طبيعتها الاصطناعية.',
+      passed: hasDisclosure,
+      details: hasDisclosure ? 'AI disclosure marker present.' : 'No AI disclosure marker — recommended for user-facing AI.',
+      remediation: 'Add aiDisclosure=true when AI interacts with end users.',
+      remediationAr: 'أضف aiDisclosure=true عند تفاعل الذكاء الاصطناعي مع المستخدمين.'
+    });
+    checks.push({
+      framework: 'DUBAI_AI_LAW', article: 'Art. 10 — Human Oversight',
+      status: (!highRisk || hasHumanOversight) ? 'COMPLIANT' : 'NON_COMPLIANT',
+      requirement: 'Consequential AI decisions must retain human-in-the-loop approval.',
+      requirementAr: 'يجب الاحتفاظ بآلية مراجعة بشرية في قرارات الذكاء الاصطناعي ذات الأثر العالي.',
+      passed: !highRisk || hasHumanOversight,
+      details: highRisk ? (hasHumanOversight ? 'Human oversight configured for high-risk AI.' : 'High-risk AI without human oversight marker.') : 'Human oversight not required.',
+      remediation: 'Add humanReview=true or humanInLoop=true for high-risk AI decisions.',
+      remediationAr: 'أضف humanReview=true أو humanInLoop=true لقرارات الذكاء الاصطناعي عالية المخاطر.'
     });
   }
 
@@ -632,13 +716,97 @@ app.get('/api/rag/docs', (req, res) => {
   res.json(ragEngine.listDocuments());
 });
 
+// Extract plain text from base64-encoded file content
+function extractTextFromFile(base64Content, mimeType, fileName) {
+  try {
+    const buf = Buffer.from(base64Content, 'base64');
+    const ext = (fileName || '').split('.').pop().toLowerCase();
+    // Plain text formats
+    if (['txt', 'md', 'csv', 'json', 'html', 'xml', 'rst'].includes(ext) ||
+        (mimeType && mimeType.startsWith('text/'))) {
+      return buf.toString('utf8');
+    }
+    // PDF: extract readable ASCII runs (basic extraction without pdftotext)
+    if (ext === 'pdf' || mimeType === 'application/pdf') {
+      // Try to extract text between stream markers
+      const raw = buf.toString('latin1');
+      const textRuns = [];
+      // Extract readable text from PDF (BT...ET blocks and parenthesized strings)
+      const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
+      let m;
+      while ((m = btEtRegex.exec(raw)) !== null) {
+        const block = m[1];
+        const strRegex = /\(([^)]*)\)/g;
+        let s;
+        while ((s = strRegex.exec(block)) !== null) {
+          const t = s[1].replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\\t/g, ' ').trim();
+          if (t.length > 2) textRuns.push(t);
+        }
+      }
+      if (textRuns.length > 0) return textRuns.join(' ');
+      // Fallback: extract printable ASCII sequences
+      return raw.replace(/[^\x20-\x7E\n]/g, ' ').replace(/\s{3,}/g, '\n').slice(0, 50000);
+    }
+    // DOCX: it's a ZIP — extract XML text runs (basic)
+    if (ext === 'docx' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const raw = buf.toString('latin1');
+      const wt = [];
+      const regex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
+      let m;
+      while ((m = regex.exec(raw)) !== null) {
+        if (m[1].trim()) wt.push(m[1]);
+      }
+      if (wt.length > 0) return wt.join(' ');
+    }
+    // Fallback: try UTF-8 decode
+    return buf.toString('utf8').replace(/\0/g, '');
+  } catch (e) {
+    return '';
+  }
+}
+
 app.post('/api/rag/ingest', async (req, res) => {
   if (!ragEngine) return res.status(503).json({ error: 'RAG not available - run npm run build' });
   try {
-    const { name, content } = req.body;
-    if (!name || !content) return res.status(400).json({ error: 'name and content required' });
-    const doc = await ragEngine.ingest(name, content);
-    res.json({ id: doc.id, name: doc.name, chunkCount: doc.chunks.length });
+    const { name, content, base64Content, mimeType, force = false } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+
+    // Resolve content: direct text OR decode base64 file
+    let text = content;
+    if (!text && base64Content) {
+      text = extractTextFromFile(base64Content, mimeType, name);
+      if (!text || text.trim().length < 10) {
+        return res.status(400).json({ error: 'Could not extract text from file. Please paste content as plain text.' });
+      }
+    }
+    if (!text) return res.status(400).json({ error: 'content or base64Content required' });
+
+    // Deduplication: use force=true to override
+    const result = force
+      ? await ragEngine.reingest(name, text)
+      : await ragEngine.ingest(name, text);
+
+    if (result.duplicate) {
+      return res.status(409).json({
+        duplicate: true,
+        duplicateType: result.duplicateType, // 'hash' (same content) or 'name' (same filename)
+        doc: { id: result.doc.id, name: result.doc.name, createdAt: result.doc.createdAt, chunkCount: result.doc.chunks.length },
+        message: result.duplicateType === 'hash'
+          ? 'This document already exists (identical content). Use force=true to re-ingest.'
+          : `A document named "${name}" already exists. Use force=true to replace it.`,
+        messageAr: result.duplicateType === 'hash'
+          ? 'هذا المستند موجود بالفعل (محتوى مطابق). استخدم force=true لإعادة الاستيعاب.'
+          : `مستند باسم "${name}" موجود بالفعل. استخدم force=true لاستبداله.`
+      });
+    }
+
+    res.json({
+      duplicate: false,
+      id: result.doc.id,
+      name: result.doc.name,
+      chunkCount: result.doc.chunks.length,
+      contentHash: result.doc.contentHash
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

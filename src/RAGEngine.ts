@@ -6,8 +6,15 @@ export interface RagDocument {
   id: string;
   name: string;
   content: string;
+  contentHash: string;
   chunks: RagChunk[];
   createdAt: string;
+}
+
+export interface RagIngestResult {
+  doc: RagDocument;
+  duplicate: boolean;
+  duplicateType?: 'hash' | 'name';
 }
 
 export interface RagChunk {
@@ -122,8 +129,33 @@ export class RAGEngine {
     return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
   }
 
-  // Ingest a document
-  async ingest(name: string, content: string): Promise<RagDocument> {
+  // Compute SHA-256 hash of content
+  contentHash(content: string): string {
+    return crypto.createHash('sha256').update(content.trim()).digest('hex');
+  }
+
+  // Find document by content hash
+  findByHash(hash: string): RagDocument | null {
+    return this.documents.find(d => d.contentHash === hash) || null;
+  }
+
+  // Find document by name (case-insensitive)
+  findByName(name: string): RagDocument | null {
+    return this.documents.find(d => d.name.toLowerCase() === name.toLowerCase()) || null;
+  }
+
+  // Ingest a document with deduplication
+  async ingest(name: string, content: string): Promise<RagIngestResult> {
+    const hash = this.contentHash(content);
+
+    // Check for exact content duplicate
+    const hashDup = this.findByHash(hash);
+    if (hashDup) return { doc: hashDup, duplicate: true, duplicateType: 'hash' };
+
+    // Check for name duplicate
+    const nameDup = this.findByName(name);
+    if (nameDup) return { doc: nameDup, duplicate: true, duplicateType: 'name' };
+
     const docId = 'doc-' + crypto.randomBytes(4).toString('hex');
     const textChunks = this.chunk(content);
     const chunks: RagChunk[] = [];
@@ -131,11 +163,20 @@ export class RAGEngine {
       const embedding = await this.embed(textChunks[i]);
       chunks.push({ id: `${docId}-c${i}`, docId, docName: name, text: textChunks[i], embedding, index: i });
     }
-    const doc: RagDocument = { id: docId, name, content, chunks, createdAt: new Date().toISOString() };
+    const doc: RagDocument = { id: docId, name, content, contentHash: hash, chunks, createdAt: new Date().toISOString() };
     this.documents.push(doc);
     this.chunks.push(...chunks);
     this.save();
-    return doc;
+    return { doc, duplicate: false };
+  }
+
+  // Force re-ingest (override duplicate)
+  async reingest(name: string, content: string): Promise<RagIngestResult> {
+    // Delete existing doc with same name if exists
+    const existing = this.findByName(name);
+    if (existing) this.deleteDocument(existing.id);
+    const result = await this.ingest(name, content);
+    return { ...result, duplicate: false };
   }
 
   // Semantic search
@@ -203,14 +244,15 @@ export class RAGEngine {
     return { answer: answerText, sources, query };
   }
 
-  // List all documents
-  listDocuments(): Omit<RagDocument, 'chunks' | 'content'>[] {
+  // List all documents (without heavy fields)
+  listDocuments(): Array<{ id: string; name: string; createdAt: string; chunkCount: number; contentHash: string }> {
     return this.documents.map(d => ({
       id: d.id,
       name: d.name,
       createdAt: d.createdAt,
-      chunkCount: d.chunks.length
-    })) as Omit<RagDocument, 'chunks' | 'content'>[];
+      chunkCount: d.chunks.length,
+      contentHash: d.contentHash || ''
+    }));
   }
 
   // Delete document
@@ -242,7 +284,11 @@ export class RAGEngine {
     if (fs.existsSync(this.storePath)) {
       try {
         const data = JSON.parse(fs.readFileSync(this.storePath, 'utf8'));
-        this.documents = data.documents || [];
+        this.documents = (data.documents || []).map((d: RagDocument) => ({
+          ...d,
+          // Backfill contentHash for existing docs without it
+          contentHash: d.contentHash || this.contentHash(d.content || d.name)
+        }));
         this.chunks = data.chunks || [];
       } catch {
         // ignore load errors

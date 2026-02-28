@@ -126,6 +126,81 @@ export class PDPLChecker {
     return [...detected];
   }
 
+  // Additional PDPL checks: Art.3 (rights), Art.16 (sensitive data), Art.18 (breach notification)
+  checkExtended(input: Record<string, unknown>, _config: UAEComplianceConfig): ComplianceCheck[] {
+    const checks: ComplianceCheck[] = [];
+    const payload = JSON.stringify(input).toLowerCase();
+
+    // Art. 3 — Data Subject Rights
+    const hasSubjectRights = Boolean(
+      input.allowAccess || input.allowDeletion || input.allowCorrection ||
+      input.dataSubjectRights || input.dsr_enabled === true || input.subject_rights
+    );
+    checks.push({
+      framework: 'PDPL',
+      article: 'Art. 3 — Data Subject Rights',
+      status: hasSubjectRights ? 'COMPLIANT' : 'REVIEW_REQUIRED',
+      requirement: 'Individuals have the right to access, correct, and delete their personal data.',
+      requirementAr: 'للأفراد الحق في الوصول إلى بياناتهم الشخصية وتصحيحها وحذفها.',
+      passed: hasSubjectRights,
+      details: hasSubjectRights
+        ? 'Data subject rights configuration marker present.'
+        : 'No data subject rights markers found — required for personal data processing systems.',
+      remediation: 'Implement and indicate data subject rights: access, correction, deletion, objection (dsr_enabled=true).',
+      remediationAr: 'طبّق وأشر إلى حقوق صاحب البيانات: الوصول، التصحيح، الحذف، الاعتراض.',
+    });
+
+    // Art. 16 — Sensitive Categories of Data
+    const SENSITIVE_MARKERS = [
+      'health', 'medical', 'biometric', 'genetic', 'ethnic', 'race',
+      'religion', 'political_opinion', 'sexual', 'criminal', 'child',
+      'minor', 'underage', 'financial_detail', 'bank_account'
+    ];
+    const sensitiveFound = SENSITIVE_MARKERS.filter(m => payload.includes(m));
+    const hasSensitive = sensitiveFound.length > 0;
+    const hasSensitiveConsent = Boolean(
+      input.sensitiveDataConsent === true || input.explicit_consent === true ||
+      input.health_consent === true || input.biometric_consent === true
+    );
+    const sensitiveOk = !hasSensitive || hasSensitiveConsent;
+    checks.push({
+      framework: 'PDPL',
+      article: 'Art. 16 — Sensitive Personal Data',
+      status: sensitiveOk ? 'COMPLIANT' : 'NON_COMPLIANT',
+      requirement: 'Sensitive data (health, biometric, genetic, religious, criminal) requires explicit separate consent and enhanced protection.',
+      requirementAr: 'تتطلب البيانات الحساسة (الصحية، البيومترية، الجينية، الدينية، الجنائية) موافقة صريحة منفصلة وحماية معززة.',
+      passed: sensitiveOk,
+      details: hasSensitive
+        ? (hasSensitiveConsent
+          ? `Sensitive data markers detected (${sensitiveFound.join(', ')}) with explicit consent.`
+          : `Sensitive data detected (${sensitiveFound.join(', ')}) without explicit separate consent.`)
+        : 'No sensitive data category markers detected.',
+      remediation: 'Add sensitiveDataConsent=true and implement enhanced controls (encryption, access restriction) for sensitive categories.',
+      remediationAr: 'أضف sensitiveDataConsent=true ونفّذ ضوابط معززة (تشفير، تقييد وصول) للفئات الحساسة.',
+    });
+
+    // Art. 18 — Data Breach Notification (72-hour rule)
+    const hasBreachPlan = Boolean(
+      input.breachNotificationEnabled === true || input.incident_response === true ||
+      input.breach_plan || input.breach_contact || input.dpo_contact
+    );
+    checks.push({
+      framework: 'PDPL',
+      article: 'Art. 18 — Breach Notification',
+      status: hasBreachPlan ? 'COMPLIANT' : 'REVIEW_REQUIRED',
+      requirement: 'Data breaches must be reported to UAE Data Office within 72 hours. Organizations must maintain an incident response plan.',
+      requirementAr: 'يجب الإبلاغ عن اختراقات البيانات لمكتب بيانات الإمارات خلال 72 ساعة مع وجود خطة استجابة للحوادث.',
+      passed: hasBreachPlan,
+      details: hasBreachPlan
+        ? 'Breach notification or incident response configuration detected.'
+        : 'No breach notification plan or DPO contact specified.',
+      remediation: 'Add breachNotificationEnabled=true and specify dpo_contact for breach reporting procedures.',
+      remediationAr: 'أضف breachNotificationEnabled=true وحدد جهة اتصال مسؤول حماية البيانات.',
+    });
+
+    return checks;
+  }
+
   private hasEmiratesId(str: string): boolean {
     return /\b784-\d{4}-\d{7}-\d\b/.test(str);
   }
