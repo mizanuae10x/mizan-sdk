@@ -143,3 +143,66 @@ describe('UAE compliance modules', () => {
     expect(report.summaryAr.length).toBeGreaterThan(0);
   });
 });
+
+// ---- Extended PDPL checks (Art. 3, Art. 16, Art. 18) ----
+describe('PDPLChecker extended checks', () => {
+  const checker = new PDPLChecker();
+  const config = { frameworks: ['PDPL'], language: 'both', auditLevel: 'full', dataResidency: 'UAE' };
+
+  test('Art.3: flags missing data subject rights', () => {
+    const checks = checker.checkExtended({ userId: 'U1', email: 'a@b.com' }, config);
+    const art3 = checks.find(c => c.article.includes('Art. 3'));
+    expect(art3).toBeDefined();
+    expect(art3.passed).toBe(false);
+    expect(art3.status).toBe('REVIEW_REQUIRED');
+  });
+
+  test('Art.3: passes with dsr_enabled marker', () => {
+    const checks = checker.checkExtended({ userId: 'U1', dsr_enabled: true }, config);
+    const art3 = checks.find(c => c.article.includes('Art. 3'));
+    expect(art3.passed).toBe(true);
+  });
+
+  test('Art.16: flags health data without explicit consent', () => {
+    const checks = checker.checkExtended({ healthRecord: 'diabetes', userId: 'U2' }, config);
+    const art16 = checks.find(c => c.article.includes('Art. 16'));
+    expect(art16).toBeDefined();
+    expect(art16.passed).toBe(false);
+    expect(art16.status).toBe('NON_COMPLIANT');
+  });
+
+  test('Art.16: passes health data WITH explicit consent', () => {
+    const checks = checker.checkExtended({ healthRecord: 'diabetes', sensitiveDataConsent: true }, config);
+    const art16 = checks.find(c => c.article.includes('Art. 16'));
+    expect(art16.passed).toBe(true);
+  });
+
+  test('Art.16: passes when no sensitive data present', () => {
+    const checks = checker.checkExtended({ action: 'document_review', role: 'analyst' }, config);
+    const art16 = checks.find(c => c.article.includes('Art. 16'));
+    expect(art16.passed).toBe(true);
+  });
+
+  test('Art.18: flags missing breach notification plan', () => {
+    const checks = checker.checkExtended({ service: 'data_processing' }, config);
+    const art18 = checks.find(c => c.article.includes('Art. 18'));
+    expect(art18).toBeDefined();
+    expect(art18.passed).toBe(false);
+    expect(art18.status).toBe('REVIEW_REQUIRED');
+  });
+
+  test('Art.18: passes with breach notification enabled', () => {
+    const checks = checker.checkExtended({ service: 'data_processing', breachNotificationEnabled: true, dpo_contact: 'dpo@example.ae' }, config);
+    const art18 = checks.find(c => c.article.includes('Art. 18'));
+    expect(art18.passed).toBe(true);
+  });
+
+  test('Extended check returns exactly 3 articles (Art.3, Art.16, Art.18)', () => {
+    const checks = checker.checkExtended({ action: 'test' }, config);
+    expect(checks).toHaveLength(3);
+    const articles = checks.map(c => c.article);
+    expect(articles.some(a => a.includes('Art. 3'))).toBe(true);
+    expect(articles.some(a => a.includes('Art. 16'))).toBe(true);
+    expect(articles.some(a => a.includes('Art. 18'))).toBe(true);
+  });
+});

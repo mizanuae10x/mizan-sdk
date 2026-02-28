@@ -17,12 +17,30 @@
     "agent",
     "governance",
     "rules-engine",
+    "compliance",
+    "pdpl",
+    "uae",
+    "dubai-ai-law",
+    "nesa",
+    "arabic",
+    "audit",
+    "rag",
+    "knowledge-base",
+    "agent-platform",
+    "llm",
     "neuro-symbolic",
-    "UAE",
     "mizan"
   ],
-  "author": "Abdullah Alkaabi",
+  "author": "Abdullah Alkaabi <mizanuae10x@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mizanuae10x/mizan-sdk.git"
+  },
+  "homepage": "https://github.com/mizanuae10x/mizan-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mizanuae10x/mizan-sdk/issues"
+  },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",

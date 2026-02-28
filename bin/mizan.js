@@ -16,7 +16,7 @@ const c = {
   gray: '\x1b[90m',
 };
 
-const VERSION = '1.1.0';
+const VERSION = require('../package.json').version;
 const logo = `${c.yellow}⚖️  Mizan SDK v${VERSION}${c.reset}`;
 
 function print(msg, color = '') { console.log(`${color}${msg}${c.reset}`); }

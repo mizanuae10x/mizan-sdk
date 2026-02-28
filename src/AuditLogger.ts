@@ -10,6 +10,24 @@ export class AuditLogger {
 
   constructor(filePath?: string) {
     this.filePath = filePath || path.join(process.cwd(), 'data', 'audit.jsonl');
+    this.restoreChainFromDisk();
+  }
+
+  // Restore previousHash from the last line of the audit file on startup
+  private restoreChainFromDisk(): void {
+    try {
+      if (!fs.existsSync(this.filePath)) return;
+      const content = fs.readFileSync(this.filePath, 'utf8').trim();
+      if (!content) return;
+      const lines = content.split('\n').filter(l => l.trim());
+      const lastLine = lines[lines.length - 1];
+      const lastEntry: AuditEntry = JSON.parse(lastLine);
+      if (lastEntry?.hash) {
+        this.previousHash = lastEntry.hash;
+      }
+    } catch {
+      // If file is corrupt, start fresh
+    }
   }
 
   private computeHash(previousHash: string, entry: Omit<AuditEntry, 'hash'>): string {
@@ -68,14 +86,46 @@ export class AuditLogger {
     return [...this.entries];
   }
 
+  /**
+   * Verify hash-chain integrity of in-memory entries.
+   * Starts from the previousHash of the first entry (which may be the genesis
+   * hash '0x0...' on first run, or a continuation hash after a restart).
+   */
   verify(): boolean {
-    let prevHash = '0'.repeat(64);
+    if (this.entries.length === 0) return true;
+    let prevHash = this.entries[0].previousHash;
     for (const entry of this.entries) {
+      if (entry.previousHash !== prevHash) return false;
       const { hash, ...rest } = entry;
       const expected = this.computeHash(prevHash, rest as any);
       if (expected !== hash) return false;
       prevHash = hash;
     }
     return true;
+  }
+
+  /**
+   * Full audit verification including genesis hash.
+   * Loads ALL entries from disk and verifies from genesis '000...'.
+   * Use for compliance auditing — slower but complete.
+   */
+  verifyFull(): boolean {
+    try {
+      if (!fs.existsSync(this.filePath)) return this.entries.length === 0;
+      const content = fs.readFileSync(this.filePath, 'utf8').trim();
+      if (!content) return this.entries.length === 0;
+      const lines = content.split('\n').filter(l => l.trim());
+      const allEntries: AuditEntry[] = lines.map(l => JSON.parse(l));
+      let prevHash = '0'.repeat(64);
+      for (const entry of allEntries) {
+        const { hash, ...rest } = entry;
+        const expected = this.computeHash(prevHash, rest as any);
+        if (expected !== hash) return false;
+        prevHash = hash;
+      }
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

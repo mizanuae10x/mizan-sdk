@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as https from 'https';
 import * as path from 'path';
 
 export interface RagDocument {
@@ -23,6 +24,7 @@ export interface RagChunk {
   docName: string;
   text: string;
   embedding: number[];
+  embeddingModel: 'ada-002' | 'hash-128'; // Track embedding type to prevent mixed-dimension search
   index: number;
 }
 
@@ -61,13 +63,17 @@ export class RAGEngine {
     return chunks.filter(c => c.trim().length > 20);
   }
 
+  // Returns which embedding model will be used
+  get embeddingModel(): 'ada-002' | 'hash-128' {
+    return this.apiKey ? 'ada-002' : 'hash-128';
+  }
+
   // Get embedding from OpenAI
   async embed(text: string): Promise<number[]> {
     if (!this.apiKey) {
       // Fallback: simple hash-based pseudo-embedding (for testing without API key)
       return this.hashEmbed(text);
     }
-    const https = await import('https');
     return new Promise((resolve, reject) => {
       const body = JSON.stringify({ input: text.slice(0, 8000), model: 'text-embedding-ada-002' });
       const req = https.request(
@@ -159,9 +165,10 @@ export class RAGEngine {
     const docId = 'doc-' + crypto.randomBytes(4).toString('hex');
     const textChunks = this.chunk(content);
     const chunks: RagChunk[] = [];
+    const model = this.embeddingModel;
     for (let i = 0; i < textChunks.length; i++) {
       const embedding = await this.embed(textChunks[i]);
-      chunks.push({ id: `${docId}-c${i}`, docId, docName: name, text: textChunks[i], embedding, index: i });
+      chunks.push({ id: `${docId}-c${i}`, docId, docName: name, text: textChunks[i], embedding, embeddingModel: model, index: i });
     }
     const doc: RagDocument = { id: docId, name, content, contentHash: hash, chunks, createdAt: new Date().toISOString() };
     this.documents.push(doc);
@@ -179,11 +186,15 @@ export class RAGEngine {
     return { ...result, duplicate: false };
   }
 
-  // Semantic search
+  // Semantic search — only searches chunks with matching embedding model
   async search(query: string, topK = 3): Promise<RagSearchResult[]> {
     if (this.chunks.length === 0) return [];
+    const currentModel = this.embeddingModel;
+    // Filter to only chunks with the same embedding model to prevent dimension mismatch
+    const compatibleChunks = this.chunks.filter(c => !c.embeddingModel || c.embeddingModel === currentModel);
+    if (compatibleChunks.length === 0) return [];
     const qEmbed = await this.embed(query);
-    return this.chunks
+    return compatibleChunks
       .map(chunk => ({ chunk, score: this.cosineSim(qEmbed, chunk.embedding) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, topK);

@@ -7,6 +7,8 @@ export interface Rule {
   action: 'APPROVED' | 'REJECTED' | 'REVIEW';
   reason: string;
   priority: number;
+  /** Optional custom score override (0–100). Defaults: APPROVED=85, REJECTED=15, REVIEW=50 */
+  score?: number;
 }
 
 export interface Decision {

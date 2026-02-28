@@ -7,6 +7,34 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// ---- SECURITY: CORS — restrict to localhost unless configured ----
+const ALLOWED_ORIGINS = (process.env.STUDIO_ALLOWED_ORIGINS || 'http://localhost:4000,http://127.0.0.1:4000').split(',');
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (same-origin, curl, Postman)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: Origin ${origin} not allowed. Set STUDIO_ALLOWED_ORIGINS env var.`));
+  },
+  credentials: true
+}));
+
+// ---- SECURITY: Simple in-process rate limiter for auth endpoints ----
+const _rateLimitMap = new Map(); // ip -> { count, resetAt }
+function authRateLimit(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = _rateLimitMap.get(ip);
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= 10) {
+      return res.status(429).json({ error: 'Too many attempts. Try again in 1 minute.' });
+    }
+    entry.count++;
+  } else {
+    _rateLimitMap.set(ip, { count: 1, resetAt: now + 60000 });
+  }
+  next();
+}
+
 const DATA_DIR = path.join(__dirname, 'data');
 const RULES_FILE = path.join(DATA_DIR, 'rules.json');
 const DECISIONS_FILE = path.join(DATA_DIR, 'decisions.json');
@@ -34,7 +62,6 @@ try {
 // Ensure data dir
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -270,7 +297,7 @@ app.post('/api/auth/setup', (req, res) => {
   res.json({ success: true, token, user: { name, email, studioName: auth.admin.studioName, language: auth.admin.language } });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authRateLimit, (req, res) => {
   const auth = readAuth();
   if (!auth.admin) return res.status(404).json({ error: 'Not set up' });
   const { email, password } = req.body;
@@ -490,34 +517,6 @@ function runComplianceCheck(input, frameworks, language) {
   const checks = [];
   const inputStr = JSON.stringify(input).toLowerCase();
 
-  if (frameworks.includes('PDPL')) {
-    const hasEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/.test(inputStr);
-    const hasEmiratesId = /784[-\s]?\d{4}[-\s]?\d{7}[-\s]?\d/.test(inputStr);
-    const hasUAEPhone = /\+971|00971|05\d/.test(inputStr);
-    const hasPII = hasEmail || hasEmiratesId || hasUAEPhone;
-
-    checks.push({
-      framework: 'PDPL',
-      article: 'Art. 10',
-      status: hasPII ? 'REVIEW_REQUIRED' : 'COMPLIANT',
-      requirement: 'Data minimization - only collect necessary personal data',
-      requirementAr: 'تقليل البيانات — جمع البيانات الشخصية الضرورية فقط',
-      passed: !hasPII,
-      details: hasPII ? 'PII detected in input: consider anonymization' : 'No unnecessary PII detected',
-      remediation: hasPII ? 'Remove or anonymize personal identifiers before processing' : null,
-      remediationAr: hasPII ? 'قم بإزالة أو إخفاء هوية المعرّفات الشخصية قبل المعالجة' : null
-    });
-    checks.push({
-      framework: 'PDPL',
-      article: 'Art. 4',
-      status: 'COMPLIANT',
-      requirement: 'Lawful basis for processing must be established',
-      requirementAr: 'يجب إثبات الأساس القانوني للمعالجة',
-      passed: true,
-      details: 'Processing basis assumed from system configuration'
-    });
-  }
-
   if (frameworks.includes('UAE_AI_ETHICS')) {
     const hasBiasTerms = /gender|race|religion|nationality|age_group/.test(inputStr);
     checks.push({
@@ -552,7 +551,7 @@ function runComplianceCheck(input, frameworks, language) {
   }
 
   if (frameworks.includes('PDPL')) {
-    // Extended PDPL — Art. 3, 16, 18
+    // PDPL — Art. 4, 6, 10, 14 (base) + Art. 3, 16, 18 (extended)
     const hasSensitive = /health|medical|biometric|genetic|ethnic|religion|political_opinion|criminal|child|minor/.test(inputStr);
     const hasSensitiveConsent = /sensitiveDataConsent|explicit_consent|health_consent|biometric_consent/.test(inputStr);
     checks.push({
